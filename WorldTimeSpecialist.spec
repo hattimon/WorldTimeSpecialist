@@ -1,11 +1,9 @@
 ﻿# -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_data_files
 
-# Base data
 _datas = [('assets', 'assets')]
 _hiddenimports = []
 
-# Optional tzdata bundle (if installed)
 try:
     import tzdata  # noqa: F401
     _datas += collect_data_files('tzdata')
