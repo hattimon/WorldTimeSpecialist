@@ -22,7 +22,7 @@ A modern desktop **Python (tkinter)** app for time zones, world clocks, market s
 <div align="center">
 
 <video controls width="720">
-  <source src="demo.mp4" type="video/mp4">
+  <source src="img/demo.mp4" type="video/mp4">
 </video>
 
 </div>
