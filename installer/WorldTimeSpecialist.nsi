@@ -4,7 +4,7 @@
 !define COMPANY "World Time Specialist"
 
 OutFile "..\release\WorldTimeSpecialist-Setup.exe"
-InstallDir "$PROGRAMFILES\WorldTimeSpecialist"
+InstallDir "$LOCALAPPDATA\WorldTimeSpecialist"
 InstallDirRegKey HKCU "Software\WorldTimeSpecialist" "InstallDir"
 RequestExecutionLevel user
 
@@ -26,6 +26,7 @@ UninstPage uninstConfirm
 UninstPage instfiles
 
 Section "Install"
+  SetShellVarContext current
   SetOutPath "$INSTDIR"
   File /r "..\dist\WorldTimeSpecialist\*"
 
@@ -38,6 +39,7 @@ Section "Install"
 SectionEnd
 
 Section "Uninstall"
+  SetShellVarContext current
   Delete "$DESKTOP\World Time Specialist.lnk"
   Delete "$SMPROGRAMS\World Time Specialist\World Time Specialist.lnk"
   RMDir "$SMPROGRAMS\World Time Specialist"
