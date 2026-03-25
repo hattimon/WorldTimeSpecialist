@@ -4,11 +4,31 @@
 
 # 🕒 World Time Specialist
 
+## 📑 Table of Contents
+
+**English**
+- [Key Features](#en-features)
+- [Requirements](#en-requirements)
+- [Run](#en-run)
+- [Build (Portable EXE)](#en-build-portable)
+- [Build (Installer EXE)](#en-build-installer)
+- [Credits](#en-credits)
+
+**Polski**
+- [Najważniejsze funkcje](#pl-features)
+- [Wymagania](#pl-requirements)
+- [Uruchomienie](#pl-run)
+- [Budowanie (Portable EXE)](#pl-build-portable)
+- [Budowanie (Installer EXE)](#pl-build-installer)
+- [Credits](#pl-credits)
+
 <a id="english"></a>
 
 ## 🇬🇧 English
 
 World Time Specialist is a desktop **Python (tkinter)** application for working with time zones, world clocks, market sessions, alarms and advanced time conversions. It is designed to be **clear, visual and accurate**, with full DST handling and fast search.
+
+<a id="en-features"></a>
 
 ### ✨ Key Features
 
@@ -34,11 +54,15 @@ World Time Specialist is a desktop **Python (tkinter)** application for working 
 - **Autostart** toggle for Windows (with optional “minimize to tray on boot”).
 - **Settings persisted** in `%APPDATA%\WorldTimeSpecialist\settings.json`.
 
+<a id="en-requirements"></a>
+
 ### 🧩 Requirements
 
 - Windows 10/11
 - Python 3.11+
 - `tzdata` (IANA time zone database for `zoneinfo`)
+
+<a id="en-run"></a>
 
 ### ▶ Run (PowerShell)
 
@@ -48,6 +72,8 @@ py -m pip install -r requirements.txt
 py app.py
 ```
 
+<a id="en-build-portable"></a>
+
 ### 🛠 Build (Portable EXE)
 
 ```powershell
@@ -56,6 +82,8 @@ py -m PyInstaller --clean WorldTimeSpecialist.spec
 ```
 
 Output: `dist\WorldTimeSpecialist.exe`
+
+<a id="en-build-installer"></a>
 
 ### 📦 Build (Installer EXE)
 
@@ -70,6 +98,8 @@ makensis installer\WorldTimeSpecialist.nsi
 
 Output: `release\WorldTimeSpecialist-Setup.exe`
 
+<a id="en-credits"></a>
+
 ### 📎 Credits
 
 - Sounds: SoundJay (https://www.soundjay.com/)
@@ -82,6 +112,8 @@ Output: `release\WorldTimeSpecialist-Setup.exe`
 ## 🇵🇱 Polski
 
 World Time Specialist to desktopowa aplikacja **Python (tkinter)** do pracy ze strefami czasowymi, zegarami świata, sesjami giełdowymi, alarmami i zaawansowanymi konwersjami czasu. Projekt jest **czytelny, wizualny i precyzyjny**, z pełnym wsparciem DST i szybkim wyszukiwaniem.
+
+<a id="pl-features"></a>
 
 ### ✨ Najważniejsze funkcje
 
@@ -107,11 +139,15 @@ World Time Specialist to desktopowa aplikacja **Python (tkinter)** do pracy ze s
 - **Autostart** w Windows (z opcją „minimalizuj do traya przy starcie”).
 - **Zapis ustawień** w `%APPDATA%\WorldTimeSpecialist\settings.json`.
 
+<a id="pl-requirements"></a>
+
 ### 🧩 Wymagania
 
 - Windows 10/11
 - Python 3.11+
 - `tzdata` (baza stref IANA dla `zoneinfo`)
+
+<a id="pl-run"></a>
 
 ### ▶ Uruchomienie (PowerShell)
 
@@ -121,6 +157,8 @@ py -m pip install -r requirements.txt
 py app.py
 ```
 
+<a id="pl-build-portable"></a>
+
 ### 🛠 Budowanie (Portable EXE)
 
 ```powershell
@@ -129,6 +167,8 @@ py -m PyInstaller --clean WorldTimeSpecialist.spec
 ```
 
 Wynik: `dist\WorldTimeSpecialist.exe`
+
+<a id="pl-build-installer"></a>
 
 ### 📦 Budowanie (Installer EXE)
 
@@ -142,6 +182,8 @@ makensis installer\WorldTimeSpecialist.nsi
 ```
 
 Wynik: `release\WorldTimeSpecialist-Setup.exe`
+
+<a id="pl-credits"></a>
 
 ### 📎 Credits
 
