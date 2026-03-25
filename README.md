@@ -4,7 +4,14 @@
 
 # 🕒 World Time Specialist
 
-**🎬 Demo (MP4):** [Watch the short app preview](https://github.com/hattimon/WorldTimeSpecialist/blob/main/demo/demo.mp4)
+**🎬 Demo (MP4 Preview):**
+
+<div align="center">
+  <video src="https://raw.githubusercontent.com/hattimon/WorldTimeSpecialist/main/demo/demo.mp4" controls width="720"></video>
+</div>
+
+If the inline player does not render on GitHub, open the video here:
+[demo.mp4](https://github.com/hattimon/WorldTimeSpecialist/blob/main/demo/demo.mp4)
 
 ## 📑 Table of Contents
 
