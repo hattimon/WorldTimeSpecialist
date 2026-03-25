@@ -20,10 +20,13 @@ A modern desktop **Python (tkinter)** app for time zones, world clocks, market s
 ## 🎬 Demo (click play)
 
 <div align="center">
-  <video src="https://raw.githubusercontent.com/hattimon/WorldTimeSpecialist/main/demo/demo.mp4" controls width="720"></video>
+
+[![Watch the demo](https://img.youtube.com/vi/VIDEO_ID/0.jpg)](https://github.com/hattimon/WorldTimeSpecialist/blob/main/demo/demo.mp4)
+
 </div>
 
-If the preview does not render, open: [demo.mp4](https://github.com/hattimon/WorldTimeSpecialist/blob/main/demo/demo.mp4)
+If the preview does not render, open:  
+👉 [demo.mp4](https://github.com/hattimon/WorldTimeSpecialist/blob/main/demo/demo.mp4)
 
 ---
 
