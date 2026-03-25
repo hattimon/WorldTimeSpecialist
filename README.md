@@ -14,6 +14,12 @@ A modern desktop **Python (tkinter)** app for time zones, world clocks, market s
 
 Full video (open in new tab): [demo.mp4](https://hattimon.github.io/WorldTimeSpecialist/index.html)
 
+## 🌍 Languages
+- 🇬🇧 English [English](#-english)
+- 🇵🇱 Polski → [Przejdź do sekcji polskiej](#-polski)
+
+---
+# 🇬🇧 English 
 
 ---
 
