@@ -6,6 +6,10 @@
 
 ## 📑 Table of Contents
 
+**Quick**
+- [Languages](#languages)
+- [Download](#download)
+
 **English**
 - [Key Features](#en-features)
 - [Requirements](#en-requirements)
@@ -21,6 +25,21 @@
 - [Budowanie (Portable EXE)](#pl-build-portable)
 - [Budowanie (Installer EXE)](#pl-build-installer)
 - [Credits](#pl-credits)
+
+<a id="languages"></a>
+
+## 🌐 Languages
+
+- 🇬🇧 English (default)
+- 🇵🇱 Polski → [Przejdź do sekcji polskiej](#polski)
+
+<a id="download"></a>
+
+## ⬇️ Download
+
+[![Download Installer](https://img.shields.io/badge/Download-Installer-blue?style=for-the-badge&logo=windows)](https://github.com/hattimon/WorldTimeSpecialist/releases/download/v1.0.0/WorldTimeSpecialist-Setup.exe)
+[![Download Portable](https://img.shields.io/badge/Download-Portable%20EXE-3b82f6?style=for-the-badge&logo=windows)](https://github.com/hattimon/WorldTimeSpecialist/releases/download/v1.0.0/WorldTimeSpecialist-Portable.exe)
+[![All Releases](https://img.shields.io/badge/All%20Releases-GitHub-111827?style=for-the-badge&logo=github)](https://github.com/hattimon/WorldTimeSpecialist/releases)
 
 <a id="english"></a>
 
