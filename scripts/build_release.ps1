@@ -39,7 +39,7 @@ if (Test-Path dist) { Remove-Item -Recurse -Force dist }
 Copy-Item -Force dist\WorldTimeSpecialist.exe release\WorldTimeSpecialist-Portable.exe
 
 # One-dir build for installer (spec to separate folder to avoid overwriting)
-& $py -m PyInstaller --clean --noconfirm --onedir --name WorldTimeSpecialist app.py `
+& $py -m PyInstaller --clean --noconfirm --onedir --noconsole --name WorldTimeSpecialist app.py `
   --icon "$iconPath" --add-data "$assetPath;assets" --collect-data tzdata --specpath build\onedir
 
 $makensis = Resolve-Makensis

@@ -35,7 +35,7 @@ $iconPath = Join-Path $assetPath 'clock.ico'
 $py = Resolve-Python $Python
 & $py -m pip install -r requirements.txt
 
-& $py -m PyInstaller --clean --noconfirm --onedir --name WorldTimeSpecialist app.py `
+& $py -m PyInstaller --clean --noconfirm --onedir --noconsole --name WorldTimeSpecialist app.py `
   --icon "$iconPath" --add-data "$assetPath;assets" --collect-data tzdata --specpath build\onedir
 
 if (-not (Test-Path release)) { New-Item -ItemType Directory -Force release | Out-Null }
