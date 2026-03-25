@@ -1,0 +1,67 @@
+{
+  "base_mode": "auto",
+  "manual_base_zone": "Europe/Madrid",
+  "manual_zone_resolved": "Europe/Madrid",
+  "language": "pl",
+  "theme": "Czarny Kontrast",
+  "auto_night": false,
+  "search_query": "",
+  "converter_input": "10:15",
+  "converter_source_zone": "EST",
+  "converter_target_mode": "base",
+  "converter_target_zone": "Europe/Warsaw",
+  "converter_live": true,
+  "compare_a": "Warszawa",
+  "compare_b": "New York",
+  "compare_reference_time": "",
+  "compare_reference_zone": "",
+  "tile_session": "NYSE (Nowy Jork 09:30-16:00)",
+  "tiles": [
+    {
+      "zone_id": "Europe/Warsaw",
+      "title": "Czas bazowy",
+      "session_key": "JPX (Tokio 09:00-15:00)",
+      "x": 10,
+      "y": 10,
+      "width": 372,
+      "height": 610
+    },
+    {
+      "zone_id": "Europe/Warsaw",
+      "title": "Czas bazowy",
+      "session_key": "XETRA (Frankfurt 09:00-17:30)",
+      "x": 382,
+      "y": 10,
+      "width": 372,
+      "height": 610
+    },
+    {
+      "zone_id": "Europe/Warsaw",
+      "title": "Czas bazowy",
+      "session_key": "LSE (Londyn 08:00-16:30)",
+      "x": 754,
+      "y": 10,
+      "width": 372,
+      "height": 610
+    },
+    {
+      "zone_id": "Europe/Warsaw",
+      "title": "Czas bazowy",
+      "session_key": "NASDAQ (Nowy Jork 09:30-16:00)",
+      "x": 1126,
+      "y": 10,
+      "width": 360,
+      "height": 610
+    },
+    {
+      "zone_id": "Europe/Warsaw",
+      "title": "Czas bazowy",
+      "session_key": "NYSE (Nowy Jork 09:30-16:00)",
+      "x": 1486,
+      "y": 10,
+      "width": 360,
+      "height": 610
+    }
+  ],
+  "window_geometry": "1920x1129+-8+-8"
+}
