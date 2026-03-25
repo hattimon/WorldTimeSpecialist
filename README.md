@@ -1,15 +1,6 @@
-﻿<p align="center">
-  <a href="#english">English</a> • <a href="#polski">Polski</a>
-</p>
-
-# 🕒 World Time Specialist
+﻿# 🕒 World Time Specialist
 
 A modern desktop **Python (tkinter)** app for time zones, world clocks, market sessions, alarms and advanced conversions.
-
-## 🌐 Languages
-
-- 🇬🇧 English (default)
-- 🇵🇱 Polski → [Przejdź do sekcji polskiej](#polski)
 
 ## ⬇️ Download
 
@@ -21,11 +12,9 @@ A modern desktop **Python (tkinter)** app for time zones, world clocks, market s
 
 [![Demo Preview](https://raw.githubusercontent.com/hattimon/WorldTimeSpecialist/main/demo/demo.gif)](https://github.com/hattimon/WorldTimeSpecialist/blob/main/demo/demo.mp4)
 
-If the preview does not render, open:  
-👉 [demo.mp4](https://github.com/hattimon/WorldTimeSpecialist/blob/main/demo/demo.mp4)
----
+If the preview does not render, open: [demo.mp4](https://github.com/hattimon/WorldTimeSpecialist/blob/main/demo/demo.mp4)
 
-<a id="english"></a>
+---
 
 ## 🇬🇧 English
 
@@ -48,15 +37,16 @@ If the preview does not render, open:
 - Python 3.11+
 - `tzdata`
 
-### ▶ Run (PowerShell)
+### ▶ Run from source (PowerShell)
 
 ```powershell
-cd C:\Users\Kosmo\Documents\Playground\world-time-specialist
+git clone https://github.com/hattimon/WorldTimeSpecialist.git
+cd WorldTimeSpecialist
 py -m pip install -r requirements.txt
 py app.py
 ```
 
-### 🛠 Build (Portable + Installer)
+### 🛠 Build (optional)
 
 ```powershell
 scripts\build_release.ps1
@@ -68,8 +58,6 @@ scripts\build_release.ps1
 - World map: NASA Blue Marble (public domain)
 
 ---
-
-<a id="polski"></a>
 
 ## 🇵🇱 Polski
 
@@ -92,15 +80,16 @@ scripts\build_release.ps1
 - Python 3.11+
 - `tzdata`
 
-### ▶ Uruchomienie (PowerShell)
+### ▶ Uruchomienie ze źródeł (PowerShell)
 
 ```powershell
-cd C:\Users\Kosmo\Documents\Playground\world-time-specialist
+git clone https://github.com/hattimon/WorldTimeSpecialist.git
+cd WorldTimeSpecialist
 py -m pip install -r requirements.txt
 py app.py
 ```
 
-### 🛠 Budowanie (Portable + Installer)
+### 🛠 Budowanie (opcjonalnie)
 
 ```powershell
 scripts\build_release.ps1
