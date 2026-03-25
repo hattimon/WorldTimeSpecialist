@@ -8,11 +8,11 @@ A modern desktop **Python (tkinter)** app for time zones, world clocks, market s
 [![Download Portable](https://img.shields.io/badge/Download-Portable%20EXE-3b82f6?style=for-the-badge&logo=windows)](https://github.com/hattimon/WorldTimeSpecialist/releases/download/v1.0.0/WorldTimeSpecialist-Portable.exe)
 [![All Releases](https://img.shields.io/badge/All%20Releases-GitHub-111827?style=for-the-badge&logo=github)](https://github.com/hattimon/WorldTimeSpecialist/releases)
 
-## 🎬 Demo (click to play)
+## 🎬 Demo
 
 [![Demo Preview](https://raw.githubusercontent.com/hattimon/WorldTimeSpecialist/main/demo/demo.gif)](https://github.com/hattimon/WorldTimeSpecialist/blob/main/demo/demo.mp4)
 
-If the preview does not render, open: [demo.mp4](https://github.com/hattimon/WorldTimeSpecialist/blob/main/demo/demo.mp4)
+Full wideo, open: [demo.mp4](https://github.com/hattimon/WorldTimeSpecialist/blob/main/demo/demo.mp4)
 
 ---
 
