@@ -1,17 +1,25 @@
-# -*- mode: python ; coding: utf-8 -*-
+﻿# -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_data_files
 
-datas = []
-datas += collect_data_files('tzdata')
-datas += [('assets', 'assets')]
+# Base data
+_datas = [('assets', 'assets')]
+_hiddenimports = []
+
+# Optional tzdata bundle (if installed)
+try:
+    import tzdata  # noqa: F401
+    _datas += collect_data_files('tzdata')
+    _hiddenimports.append('tzdata')
+except Exception:
+    pass
 
 
 a = Analysis(
     ['app.py'],
     pathex=[],
     binaries=[],
-    datas=datas,
-    hiddenimports=[],
+    datas=_datas,
+    hiddenimports=_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

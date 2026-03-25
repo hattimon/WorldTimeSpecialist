@@ -17,6 +17,7 @@ if (-not (Get-Command "makensis" -ErrorAction SilentlyContinue)) {
 }
 
 $py = Resolve-Python $Python
+& $py -m pip install -r requirements.txt
 
 & $py -m PyInstaller --clean --noconfirm --onedir --name WorldTimeSpecialist app.py `
   --icon assets\clock.ico --add-data "assets;assets" --collect-data tzdata

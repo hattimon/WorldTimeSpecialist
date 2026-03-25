@@ -13,6 +13,7 @@ function Resolve-Python {
 }
 
 $py = Resolve-Python $Python
+& $py -m pip install -r requirements.txt
 
 if (-not (Test-Path release)) { New-Item -ItemType Directory -Force release | Out-Null }
 

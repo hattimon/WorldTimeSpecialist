@@ -1,12 +1,16 @@
-﻿# World Time Specialist
+﻿<p align="center">
+  <a href="#english">English</a> • <a href="#polski">Polski</a>
+</p>
 
-[Polski](#polski)
+# 🕒 World Time Specialist
 
-## English
+<a id="english"></a>
+
+## 🇬🇧 English
 
 World Time Specialist is a desktop **Python (tkinter)** application for working with time zones, world clocks, market sessions, alarms and advanced time conversions. It is designed to be **clear, visual and accurate**, with full DST handling and fast search.
 
-### Key Features
+### ✨ Key Features
 
 - **Base time** modes: `AUTO` (system time zone) or `MANUAL` (forced base zone). All views show offsets relative to the base.
 - **Two UI languages**: Polish and English (instant switch).
@@ -14,7 +18,7 @@ World Time Specialist is a desktop **Python (tkinter)** application for working 
 - **City/country search** with online lookup for smaller locations.
 - **Universal time converter** (IANA, abbreviations, UTC offsets, and city input).
 - **Two‑city comparison** (difference, local time, and context summary).
-- **Education tab**: structured, readable explanation of UTC/IANA/offsets with history and context.
+- **Education tab**: structured explanation of UTC/IANA/offsets with history and context.
 - **World map tab**: realistic map with UTC bands, day/night highlight and live city markers.
 - **Time tiles dashboard** with analog + digital clocks.
   - Drag, resize, **magnetic snap**, full‑screen mode.
@@ -30,13 +34,13 @@ World Time Specialist is a desktop **Python (tkinter)** application for working 
 - **Autostart** toggle for Windows (with optional “minimize to tray on boot”).
 - **Settings persisted** in `%APPDATA%\WorldTimeSpecialist\settings.json`.
 
-### Requirements
+### 🧩 Requirements
 
 - Windows 10/11
 - Python 3.11+
 - `tzdata` (IANA time zone database for `zoneinfo`)
 
-### Run (PowerShell)
+### ▶ Run (PowerShell)
 
 ```powershell
 cd C:\Users\Kosmo\Documents\Playground\world-time-specialist
@@ -44,7 +48,7 @@ py -m pip install -r requirements.txt
 py app.py
 ```
 
-### Build (Portable EXE)
+### 🛠 Build (Portable EXE)
 
 ```powershell
 py -m pip install pyinstaller
@@ -53,7 +57,7 @@ py -m PyInstaller --clean WorldTimeSpecialist.spec
 
 Output: `dist\WorldTimeSpecialist.exe`
 
-### Build (Installer EXE)
+### 📦 Build (Installer EXE)
 
 This project includes an NSIS script. Build the **one‑dir** package and run NSIS:
 
@@ -66,7 +70,7 @@ makensis installer\WorldTimeSpecialist.nsi
 
 Output: `release\WorldTimeSpecialist-Setup.exe`
 
-### Credits
+### 📎 Credits
 
 - Sounds: SoundJay (https://www.soundjay.com/)
 - World map: NASA Blue Marble (public domain)
@@ -75,11 +79,11 @@ Output: `release\WorldTimeSpecialist-Setup.exe`
 
 <a id="polski"></a>
 
-## Polski
+## 🇵🇱 Polski
 
 World Time Specialist to desktopowa aplikacja **Python (tkinter)** do pracy ze strefami czasowymi, zegarami świata, sesjami giełdowymi, alarmami i zaawansowanymi konwersjami czasu. Projekt jest **czytelny, wizualny i precyzyjny**, z pełnym wsparciem DST i szybkim wyszukiwaniem.
 
-### Najważniejsze funkcje
+### ✨ Najważniejsze funkcje
 
 - **Czas bazowy**: `AUTO` (strefa systemu) lub `MANUAL` (wymuszona strefa bazowa). Wszystkie widoki liczą różnice względem bazy.
 - **Dwa języki interfejsu**: polski i angielski (natychmiastowe przełączanie).
@@ -103,13 +107,13 @@ World Time Specialist to desktopowa aplikacja **Python (tkinter)** do pracy ze s
 - **Autostart** w Windows (z opcją „minimalizuj do traya przy starcie”).
 - **Zapis ustawień** w `%APPDATA%\WorldTimeSpecialist\settings.json`.
 
-### Wymagania
+### 🧩 Wymagania
 
 - Windows 10/11
 - Python 3.11+
 - `tzdata` (baza stref IANA dla `zoneinfo`)
 
-### Uruchomienie (PowerShell)
+### ▶ Uruchomienie (PowerShell)
 
 ```powershell
 cd C:\Users\Kosmo\Documents\Playground\world-time-specialist
@@ -117,7 +121,7 @@ py -m pip install -r requirements.txt
 py app.py
 ```
 
-### Budowanie (Portable EXE)
+### 🛠 Budowanie (Portable EXE)
 
 ```powershell
 py -m pip install pyinstaller
@@ -126,7 +130,7 @@ py -m PyInstaller --clean WorldTimeSpecialist.spec
 
 Wynik: `dist\WorldTimeSpecialist.exe`
 
-### Budowanie (Installer EXE)
+### 📦 Budowanie (Installer EXE)
 
 Projekt zawiera skrypt NSIS. Najpierw zbuduj paczkę **onedir**, potem uruchom NSIS:
 
@@ -139,7 +143,7 @@ makensis installer\WorldTimeSpecialist.nsi
 
 Wynik: `release\WorldTimeSpecialist-Setup.exe`
 
-### Credits
+### 📎 Credits
 
 - Dźwięki: SoundJay (https://www.soundjay.com/)
 - Mapa świata: NASA Blue Marble (public domain)

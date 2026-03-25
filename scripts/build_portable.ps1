@@ -16,4 +16,5 @@ function Resolve-Python {
 }
 
 $py = Resolve-Python $Python
+& $py -m pip install -r requirements.txt
 & $py -m PyInstaller --clean WorldTimeSpecialist.spec
