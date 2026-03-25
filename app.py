@@ -2900,8 +2900,8 @@ class TimeSpecialistApp(tk.Tk):
     def _build_map_tab(self) -> None:
         root = ttk.Frame(self.map_tab, style="Root.TFrame")
         root.pack(fill="both", expand=True)
-        root.columnconfigure(0, weight=3)
-        root.columnconfigure(1, weight=2)
+        root.columnconfigure(0, weight=5)
+        root.columnconfigure(1, weight=1)
         root.rowconfigure(1, weight=1)
 
         header = ttk.Frame(root, style="Card.TFrame", padding=12)
@@ -2956,6 +2956,8 @@ class TimeSpecialistApp(tk.Tk):
 
         side = ttk.Frame(root, style="Card.TFrame", padding=12)
         side.grid(row=1, column=1, sticky="nsew", padx=(8, 0))
+        side.configure(width=320)
+        side.grid_propagate(False)
         side.columnconfigure(0, weight=1)
         side.rowconfigure(1, weight=1)
         self.map_side_title = ttk.Label(side, text="", style="CardTitle.TLabel")
