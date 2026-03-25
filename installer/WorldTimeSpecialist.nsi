@@ -14,6 +14,8 @@ VIAddVersionKey "ProductName" "${APP_NAME}"
 VIAddVersionKey "CompanyName" "${COMPANY}"
 VIAddVersionKey "ProductVersion" "${APP_VERSION}"
 VIAddVersionKey "FileVersion" "${APP_VERSION}"
+VIAddVersionKey "FileDescription" "${APP_NAME}"
+VIAddVersionKey "LegalCopyright" "Copyright (c) 2026"
 
 Icon "..\assets\clock.ico"
 UninstallIcon "..\assets\clock.ico"
