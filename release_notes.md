@@ -17,6 +17,7 @@
 
 - `WorldTimeSpecialist-Portable.exe`
 - `WorldTimeSpecialist-Setup.exe`
+- `build-scripts.zip` (build scripts + NSIS + spec)
 - `checksums.txt`
 
 ---
@@ -38,4 +39,5 @@
 
 - `WorldTimeSpecialist-Portable.exe`
 - `WorldTimeSpecialist-Setup.exe`
+- `build-scripts.zip` (skrypty build + NSIS + spec)
 - `checksums.txt`
