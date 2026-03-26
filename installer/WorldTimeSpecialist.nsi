@@ -1,6 +1,6 @@
 ﻿!define APP_NAME "World Time Specialist"
 !define APP_EXE "WorldTimeSpecialist.exe"
-!define APP_VERSION "1.0.0"
+!define APP_VERSION "1.0.1"
 !define COMPANY "World Time Specialist"
 
 OutFile "..\release\WorldTimeSpecialist-Setup.exe"
@@ -9,7 +9,7 @@ InstallDirRegKey HKCU "Software\WorldTimeSpecialist" "InstallDir"
 RequestExecutionLevel user
 
 Name "${APP_NAME}"
-VIProductVersion "1.0.0.0"
+VIProductVersion "1.0.1.0"
 VIAddVersionKey "ProductName" "${APP_NAME}"
 VIAddVersionKey "CompanyName" "${COMPANY}"
 VIAddVersionKey "ProductVersion" "${APP_VERSION}"
@@ -48,3 +48,4 @@ Section "Uninstall"
   RMDir /r "$INSTDIR"
   DeleteRegKey HKCU "Software\WorldTimeSpecialist"
 SectionEnd
+

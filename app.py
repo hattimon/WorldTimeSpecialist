@@ -42,7 +42,8 @@ SOUND_SESSION_START = SOUNDS_DIR / "session_start.wav"
 SOUND_SESSION_END = SOUNDS_DIR / "session_end.wav"
 SOUND_ALARM = SOUNDS_DIR / "alarm.wav"
 SOUND_TIMER = SOUNDS_DIR / "timer_end.wav"
-SOUND_TICKING = SOUNDS_DIR / "clock-ticking-1.wav"
+# Use the softest bundled ticking sample to keep active-session ambience subtle.
+SOUND_TICKING = SOUNDS_DIR / "clock-ticking-2.wav"
 TRAY_ICON_FILE = ASSETS_DIR / "clock.ico"
 DEFAULT_ALARM_SOUND_ID = "alarm_clock_01"
 
@@ -96,6 +97,23 @@ WORLD_HIGHLIGHTS: list[tuple[str, str]] = [
     ("Sydney", "Australia/Sydney"),
     ("Auckland", "Pacific/Auckland"),
 ]
+
+CITY_LABELS: dict[str, dict[str, str]] = {
+    "Warszawa": {"pl": "Warszawa", "en": "Warsaw"},
+    "Londyn": {"pl": "Londyn", "en": "London"},
+    "Nowy Jork": {"pl": "Nowy Jork", "en": "New York"},
+    "Chicago": {"pl": "Chicago", "en": "Chicago"},
+    "Denver": {"pl": "Denver", "en": "Denver"},
+    "Los Angeles": {"pl": "Los Angeles", "en": "Los Angeles"},
+    "Sao Paulo": {"pl": "Sao Paulo", "en": "Sao Paulo"},
+    "Johannesburg": {"pl": "Johannesburg", "en": "Johannesburg"},
+    "Dubaj": {"pl": "Dubaj", "en": "Dubai"},
+    "Delhi": {"pl": "Delhi", "en": "Delhi"},
+    "Singapur": {"pl": "Singapur", "en": "Singapore"},
+    "Tokio": {"pl": "Tokio", "en": "Tokyo"},
+    "Sydney": {"pl": "Sydney", "en": "Sydney"},
+    "Auckland": {"pl": "Auckland", "en": "Auckland"},
+}
 
 MAP_CITY_LONGITUDE: dict[str, float] = {
     "Warszawa": 21.01,
@@ -270,13 +288,24 @@ SESSION_PRESETS: dict[str, dict[str, str] | None] = {
     "JPX (Tokio 09:00-15:00)": {"zone": "Asia/Tokyo", "open": "09:00", "close": "15:00"},
 }
 
+SESSION_LABELS: dict[str, dict[str, str]] = {
+    "Brak sesji": {"pl": "Brak sesji", "en": "No session"},
+    "NYSE (Nowy Jork 09:30-16:00)": {"pl": "NYSE (Nowy Jork 09:30-16:00)", "en": "NYSE (New York 09:30-16:00)"},
+    "NASDAQ (Nowy Jork 09:30-16:00)": {"pl": "NASDAQ (Nowy Jork 09:30-16:00)", "en": "NASDAQ (New York 09:30-16:00)"},
+    "LSE (Londyn 08:00-16:30)": {"pl": "LSE (Londyn 08:00-16:30)", "en": "LSE (London 08:00-16:30)"},
+    "XETRA (Frankfurt 09:00-17:30)": {"pl": "XETRA (Frankfurt 09:00-17:30)", "en": "XETRA (Frankfurt 09:00-17:30)"},
+    "JPX (Tokio 09:00-15:00)": {"pl": "JPX (Tokio 09:00-15:00)", "en": "JPX (Tokyo 09:00-15:00)"},
+}
+
 SETTINGS_DIR = Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / "WorldTimeSpecialist"
 STARTUP_DIR = Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
 AUTOSTART_FILE = STARTUP_DIR / "WorldTimeSpecialist.cmd"
 SETTINGS_FILE = SETTINGS_DIR / "settings.json"
 LEGACY_SETTINGS_FILE = Path(__file__).with_name("world_time_settings.json")
 DEFAULT_THEME = "Nowoczesny Szklany"
-NIGHT_THEME = "Nocny Cieply"
+NIGHT_THEME = "Czarny Kontrast"
+AUTO_NIGHT_DEFAULT_START = "21:00"
+AUTO_NIGHT_DEFAULT_STOP = "06:00"
 TILE_MIN_WIDTH = 280
 TILE_MIN_HEIGHT = 360
 TILE_DEFAULT_WIDTH = 360
@@ -575,6 +604,19 @@ THEMES: dict[str, dict[str, object]] = {
     },
 }
 
+THEME_LABELS: dict[str, dict[str, str]] = {
+    "Nowoczesny Szklany": {"pl": "Nowoczesny Szklany", "en": "Modern Glass"},
+    "Ciemny Klasyczny": {"pl": "Ciemny Klasyczny", "en": "Dark Classic"},
+    "Czarny Kontrast": {"pl": "Czarny Kontrast", "en": "Black Contrast"},
+    "Jasny Klasyczny": {"pl": "Jasny Klasyczny", "en": "Light Classic"},
+    "Nocny Cieply": {"pl": "Nocny Ciepły", "en": "Warm Night"},
+    "Ciemny Komfort Oczy": {"pl": "Ciemny Komfort Oczy", "en": "Eye Comfort Dark"},
+    "Szafirowa Mgła": {"pl": "Szafirowa Mgła", "en": "Sapphire Mist"},
+    "Metaliczny Grafit": {"pl": "Metaliczny Grafit", "en": "Metallic Graphite"},
+}
+
+TIME_PICKER_VALUES = [f"{hour:02d}:{minute:02d}" for hour in range(24) for minute in (0, 30)]
+
 PHASE_BG = THEMES[DEFAULT_THEME]["phase_bg"]
 
 OFFSET_REPRESENTATIVE_ZONE: dict[int, str] = {
@@ -811,7 +853,7 @@ LANGUAGES = {"pl": "Polski", "en": "English"}
 I18N: dict[str, dict[str, str]] = {
     "lang_label": {"pl": "Język:", "en": "Language:"},
     "theme_label": {"pl": "Motyw:", "en": "Theme:"},
-    "auto_night": {"pl": "Auto nocny (ciepły po 21:00)", "en": "Auto night mode (warm after 21:00)"},
+    "auto_night": {"pl": "Auto nocny", "en": "Auto night"},
     "base_time": {"pl": "Czas bazowy", "en": "Base time"},
     "tab_world": {"pl": "Czasy Świata", "en": "World Times"},
     "tab_search": {"pl": "Szukaj Miasta/Kraju", "en": "Search City/Country"},
@@ -1277,6 +1319,16 @@ def parse_alarm_time(value: str) -> tuple[int, int, int] | None:
     return None
 
 
+def normalize_hhmm(value: str, fallback: str) -> str:
+    parsed = parse_alarm_time(value.strip())
+    if not parsed:
+        parsed = parse_alarm_time(fallback)
+    if not parsed:
+        return fallback
+    hour, minute, _second = parsed
+    return f"{hour:02d}:{minute:02d}"
+
+
 def parse_alarm_date(value: str) -> date | None:
     raw = value.strip()
     if not raw:
@@ -1706,7 +1758,12 @@ class TimeSpecialistApp(tk.Tk):
         self.language_var = tk.StringVar(value=language_loaded)
         self.base_notice_var = tk.StringVar(value="Tryb AUTO: bazowa strefa = lokalna strefa systemu.")
         self.theme_var = tk.StringVar(value=loaded_theme)
+        self.theme_display_var = tk.StringVar(value="")
         self.auto_night_var = tk.BooleanVar(value=loaded_auto_night)
+        loaded_auto_night_start = normalize_hhmm(str(self._loaded_settings.get("auto_night_start", AUTO_NIGHT_DEFAULT_START)), AUTO_NIGHT_DEFAULT_START)
+        loaded_auto_night_stop = normalize_hhmm(str(self._loaded_settings.get("auto_night_stop", AUTO_NIGHT_DEFAULT_STOP)), AUTO_NIGHT_DEFAULT_STOP)
+        self.auto_night_start_var = tk.StringVar(value=loaded_auto_night_start)
+        self.auto_night_stop_var = tk.StringVar(value=loaded_auto_night_stop)
 
         self.base_time_var = tk.StringVar(value="--:--:--")
         self.base_info_var = tk.StringVar(value="")
@@ -1741,12 +1798,16 @@ class TimeSpecialistApp(tk.Tk):
         self.education_body_var = tk.StringVar(value="")
 
         self.tile_query_var = tk.StringVar(value=str(self._loaded_settings.get("tile_query", "")))
-        self.tile_session_var = tk.StringVar(value=str(self._loaded_settings.get("tile_session", "Brak sesji")))
+        loaded_tile_session = self._resolve_session_key(str(self._loaded_settings.get("tile_session", "Brak sesji")))
+        if loaded_tile_session not in SESSION_PRESETS:
+            loaded_tile_session = "Brak sesji"
+        self.tile_session_var = tk.StringVar(value=loaded_tile_session)
         self.tile_status_var = tk.StringVar(value=I18N["tile_status_hint"]["pl"])
         self.session_sound_enabled_var = tk.BooleanVar(value=bool(self._loaded_settings.get("session_sound_enabled", True)))
         self.tile_ticking_var = tk.BooleanVar(value=bool(self._loaded_settings.get("tile_ticking", False)))
         self.session_state_cache: dict[int, bool] = {}
         self.ticking_after_id: str | None = None
+        self.ticking_generation = 0
         self.any_session_active = False
         self.sound_muted = bool(self._loaded_settings.get("sound_muted", False))
         self.tray_icon: object | None = None
@@ -1767,7 +1828,6 @@ class TimeSpecialistApp(tk.Tk):
         self.alarm_month_var = tk.StringVar(value="")
         self.alarm_year_var = tk.StringVar(value="")
         self.alarm_enabled_var = tk.BooleanVar(value=True)
-        self.alarm_repeat_daily_var = tk.BooleanVar(value=True)
         self.alarms_paused_var = tk.BooleanVar(value=bool(self._loaded_settings.get("alarms_paused", False)))
         self.alarm_duration_var = tk.StringVar(value="20")
         self.alarm_sound_display_var = tk.StringVar(value="")
@@ -1928,6 +1988,9 @@ class TimeSpecialistApp(tk.Tk):
         self._refresh_tray_support_buttons()
         self._update_all_headings()
         self._refresh_alarm_sound_values()
+        self._refresh_theme_combo_values()
+        self._refresh_session_combo_values()
+        self._configure_alarm_tree_tags()
 
         if hasattr(self, "education_tree"):
             for topic_id, _ in EDUCATION_TREE:
@@ -1949,20 +2012,121 @@ class TimeSpecialistApp(tk.Tk):
         self._run_comparison()
 
     def _on_theme_change(self, event: tk.Event | None = None) -> None:
-        selected = self.theme_var.get().strip()
-        if selected in THEMES:
-            self.theme_name = selected
+        selected = self.theme_display_var.get().strip() or self.theme_var.get().strip()
+        resolved_theme = self._resolve_theme_name(selected)
+        if resolved_theme in THEMES:
+            self.theme_name = resolved_theme
+            self.theme_var.set(resolved_theme)
+        self.auto_night_start_var.set(normalize_hhmm(self.auto_night_start_var.get(), AUTO_NIGHT_DEFAULT_START))
+        self.auto_night_stop_var.set(normalize_hhmm(self.auto_night_stop_var.get(), AUTO_NIGHT_DEFAULT_STOP))
         self.auto_night_enabled = bool(self.auto_night_var.get())
+        self._refresh_theme_combo_values()
         self._apply_theme()
         self._mark_settings_dirty()
 
     def _effective_theme_name(self) -> str:
         base_theme = self.theme_name if self.theme_name in THEMES else DEFAULT_THEME
         if self.auto_night_enabled:
-            now_hour = datetime.now().astimezone().hour
-            if now_hour >= 21 or now_hour < 6:
+            start_h, start_m, _ = parse_alarm_time(normalize_hhmm(self.auto_night_start_var.get(), AUTO_NIGHT_DEFAULT_START)) or (21, 0, 0)
+            stop_h, stop_m, _ = parse_alarm_time(normalize_hhmm(self.auto_night_stop_var.get(), AUTO_NIGHT_DEFAULT_STOP)) or (6, 0, 0)
+            now_dt = datetime.now().astimezone()
+            now_minutes = now_dt.hour * 60 + now_dt.minute
+            start_minutes = start_h * 60 + start_m
+            stop_minutes = stop_h * 60 + stop_m
+            if start_minutes == stop_minutes:
+                return NIGHT_THEME
+            if start_minutes < stop_minutes:
+                in_night_window = start_minutes <= now_minutes < stop_minutes
+            else:
+                in_night_window = now_minutes >= start_minutes or now_minutes < stop_minutes
+            if in_night_window:
                 return NIGHT_THEME
         return base_theme
+
+    def _theme_display_name(self, theme_name: str) -> str:
+        labels = THEME_LABELS.get(theme_name, {"pl": theme_name, "en": theme_name})
+        return labels.get(self.language_var.get(), labels.get("pl", theme_name))
+
+    def _city_display_name(self, city_name: str) -> str:
+        labels = CITY_LABELS.get(city_name)
+        if labels is None:
+            for entry in CITY_LABELS.values():
+                if city_name == entry.get("pl") or city_name == entry.get("en"):
+                    labels = entry
+                    break
+        if labels is None:
+            labels = {"pl": city_name, "en": city_name}
+        return labels.get(self.language_var.get(), labels.get("pl", city_name))
+
+    def _session_display_name(self, session_key: str) -> str:
+        labels = SESSION_LABELS.get(session_key, {"pl": session_key, "en": session_key})
+        return labels.get(self.language_var.get(), labels.get("pl", session_key))
+
+    def _resolve_session_key(self, value: str) -> str:
+        raw = value.strip()
+        if raw in SESSION_PRESETS:
+            return raw
+        for session_key, labels in SESSION_LABELS.items():
+            if raw == labels.get("pl") or raw == labels.get("en"):
+                return session_key
+        return raw
+
+    def _resolve_theme_name(self, value: str) -> str | None:
+        raw = value.strip()
+        if raw in THEMES:
+            return raw
+        for theme_name, labels in THEME_LABELS.items():
+            if raw == labels.get("pl") or raw == labels.get("en"):
+                return theme_name
+        return None
+
+    def _refresh_theme_combo_values(self) -> None:
+        if not hasattr(self, "theme_combo"):
+            return
+        values = [self._theme_display_name(theme_name) for theme_name in THEMES]
+        self._theme_display_lookup = {self._theme_display_name(theme_name): theme_name for theme_name in THEMES}
+        self.theme_combo.configure(values=values)
+        self.theme_display_var.set(self._theme_display_name(self.theme_name))
+
+    def _refresh_session_combo_values(self) -> None:
+        if not hasattr(self, "tile_session_combo"):
+            return
+        values = [self._session_display_name(session_key) for session_key in SESSION_PRESETS]
+        self.tile_session_combo.configure(values=values)
+        resolved = self._resolve_session_key(self.tile_session_var.get())
+        if resolved not in SESSION_PRESETS:
+            resolved = "Brak sesji"
+        self.tile_session_var.set(self._session_display_name(resolved))
+
+    def _configure_alarm_tree_tags(self) -> None:
+        if not hasattr(self, "alarms_tree"):
+            return
+        enabled_fg = blend_hex(str(self.theme_palette.get("session_active", "#21603A")), "#FFFFFF", 0.35)
+        disabled_fg = blend_hex(str(self.theme_palette.get("session_inactive", "#603030")), "#FFFFFF", 0.25)
+        self.alarms_tree.tag_configure("alarm_enabled", foreground=enabled_fg)
+        self.alarms_tree.tag_configure("alarm_disabled", foreground=disabled_fg)
+
+    def _tile_display_title(self, card: TileCard) -> str:
+        if card.session_key in SESSION_PRESETS and card.session_key != "Brak sesji":
+            return self._session_display_name(card.session_key)
+        if card.title.startswith("Bazowy:") or card.title.startswith("Base:"):
+            return self._t(f"Bazowy: {card.zone_id}", f"Base: {card.zone_id}")
+        return self._city_display_name(card.title) if card.title in CITY_LABELS else card.title
+
+    def _refresh_map_side_layout(self, _event: tk.Event | None = None) -> None:
+        if not hasattr(self, "map_side_text"):
+            return
+        if hasattr(self, "map_side_title"):
+            wrap = max(120, self.map_side_title.winfo_width() or 180)
+            self.map_side_title.configure(wraplength=wrap, justify="left")
+        self.map_side_text.update_idletasks()
+        top, bottom = self.map_side_text.yview()
+        needs_scroll = bottom - top < 0.999
+        if hasattr(self, "map_side_scroll"):
+            if needs_scroll:
+                self.map_side_scroll.grid()
+            else:
+                self.map_side_scroll.grid_remove()
 
     def _apply_theme(self, force: bool = False) -> None:
         theme_name = self._effective_theme_name()
@@ -2022,6 +2186,7 @@ class TimeSpecialistApp(tk.Tk):
         self.style.configure("Treeview", background=tree_bg, fieldbackground=tree_bg, foreground=text, rowheight=34, borderwidth=0, font=("Bahnschrift", 11))
         self.style.configure("Treeview.Heading", background=tree_head_bg, foreground=heading, font=("Bahnschrift", 11, "bold"), relief="flat")
         self.style.map("Treeview", background=[("selected", accent_soft)], foreground=[("selected", heading)])
+        self._configure_alarm_tree_tags()
         self.style.configure("Search.TEntry", padding=(8, 6), fieldbackground=entry_bg, foreground=entry_text)
         self.style.configure("TScrollbar", gripcount=0, background=blend_hex(accent, app_bg, 0.35), troughcolor=canvas_bottom)
         glass_a = blend_hex(card_bg, "#FFFFFF", 0.10)
@@ -2135,7 +2300,7 @@ class TimeSpecialistApp(tk.Tk):
 
         self.manual_base_button = ttk.Button(base_control, text="Zastosuj", style="Action.TButton", command=self._apply_manual_base)
         self.manual_base_button.grid(row=0, column=3, sticky="e")
-        self._bind_i18n(self.manual_base_button, "text", "Zastosuj", "Apply")
+        self._bind_i18n(self.manual_base_button, "text", "✔ Zastosuj", "✔ Apply")
 
         self.language_label = ttk.Label(base_control, text="", style="SmallInfo.TLabel")
         self.language_label.grid(row=1, column=0, sticky="w", pady=(8, 0))
@@ -2156,12 +2321,46 @@ class TimeSpecialistApp(tk.Tk):
         self.theme_label = ttk.Label(self.theme_frame, text="", style="SmallInfo.TLabel")
         self.theme_label.pack(side="left")
         self._bind_i18n(self.theme_label, "text", "Motyw:", "Theme:")
-        self.theme_combo = ttk.Combobox(self.theme_frame, textvariable=self.theme_var, values=list(THEMES.keys()), state="readonly", width=24, style="Glass.TCombobox")
+        self.theme_combo = ttk.Combobox(self.theme_frame, textvariable=self.theme_display_var, values=[], state="readonly", width=24, style="Glass.TCombobox")
         self.theme_combo.pack(side="left", padx=(8, 0))
         self.theme_combo.bind("<<ComboboxSelected>>", self._on_theme_change)
-        self.auto_night_check = ttk.Checkbutton(base_control, text="", variable=self.auto_night_var, command=self._on_theme_change)
-        self.auto_night_check.grid(row=1, column=3, sticky="w", pady=(8, 0))
-        self._bind_i18n(self.auto_night_check, "text", "Auto nocny (ciepły po 21:00)", "Auto night mode (warm after 21:00)")
+        self._refresh_theme_combo_values()
+
+        self.auto_night_frame = ttk.Frame(base_control, style="Card.TFrame")
+        self.auto_night_frame.grid(row=1, column=3, columnspan=4, sticky="w", pady=(8, 0))
+        self.auto_night_check = ttk.Checkbutton(self.auto_night_frame, text="", variable=self.auto_night_var, command=self._on_theme_change)
+        self.auto_night_check.pack(side="left")
+        self._bind_i18n(self.auto_night_check, "text", "Auto nocny", "Auto night")
+        self.auto_night_start_label = ttk.Label(self.auto_night_frame, text="", style="SmallInfo.TLabel")
+        self.auto_night_start_label.pack(side="left", padx=(10, 4))
+        self._bind_i18n(self.auto_night_start_label, "text", "Start:", "Start:")
+        self.auto_night_start_combo = ttk.Combobox(
+            self.auto_night_frame,
+            textvariable=self.auto_night_start_var,
+            values=TIME_PICKER_VALUES,
+            width=6,
+            state="normal",
+            style="Glass.TCombobox",
+        )
+        self.auto_night_start_combo.pack(side="left")
+        self.auto_night_start_combo.bind("<<ComboboxSelected>>", self._on_theme_change)
+        self.auto_night_start_combo.bind("<FocusOut>", self._on_theme_change, add="+")
+        self._register_autocomplete(self.auto_night_start_combo, TIME_PICKER_VALUES)
+        self.auto_night_stop_label = ttk.Label(self.auto_night_frame, text="", style="SmallInfo.TLabel")
+        self.auto_night_stop_label.pack(side="left", padx=(10, 4))
+        self._bind_i18n(self.auto_night_stop_label, "text", "Stop:", "Stop:")
+        self.auto_night_stop_combo = ttk.Combobox(
+            self.auto_night_frame,
+            textvariable=self.auto_night_stop_var,
+            values=TIME_PICKER_VALUES,
+            width=6,
+            state="normal",
+            style="Glass.TCombobox",
+        )
+        self.auto_night_stop_combo.pack(side="left")
+        self.auto_night_stop_combo.bind("<<ComboboxSelected>>", self._on_theme_change)
+        self.auto_night_stop_combo.bind("<FocusOut>", self._on_theme_change, add="+")
+        self._register_autocomplete(self.auto_night_stop_combo, TIME_PICKER_VALUES)
 
         self.session_sound_check = ttk.Checkbutton(base_control, text="", variable=self.session_sound_enabled_var)
         self.session_sound_check.grid(row=2, column=0, sticky="w", pady=(8, 0))
@@ -2173,16 +2372,16 @@ class TimeSpecialistApp(tk.Tk):
 
         self.autostart_add_btn = ttk.Button(base_control, text="", style="Action.TButton", command=self._add_to_autostart)
         self.autostart_add_btn.grid(row=2, column=2, sticky="w", padx=(16, 8), pady=(8, 0))
-        self._bind_i18n(self.autostart_add_btn, "text", "Dodaj do autostartu", "Add to autostart")
+        self._bind_i18n(self.autostart_add_btn, "text", "🚀 Dodaj do autostartu", "🚀 Add to autostart")
         self.autostart_remove_btn = ttk.Button(base_control, text="", style="Action.TButton", command=self._remove_from_autostart)
         self.autostart_remove_btn.grid(row=2, column=3, sticky="w", padx=(0, 8), pady=(8, 0))
-        self._bind_i18n(self.autostart_remove_btn, "text", "Usuń z autostartu", "Remove from autostart")
+        self._bind_i18n(self.autostart_remove_btn, "text", "🛑 Usuń z autostartu", "🛑 Remove from autostart")
         self.tray_minimize_btn = ttk.Button(base_control, text="", style="Action.TButton", command=self._minimize_to_tray)
         self.tray_minimize_btn.grid(row=2, column=4, sticky="w", padx=(0, 4), pady=(8, 0))
-        self._bind_i18n(self.tray_minimize_btn, "text", "Minimalizuj do tray", "Minimize to tray")
+        self._bind_i18n(self.tray_minimize_btn, "text", "📥 Minimalizuj do tray", "📥 Minimize to tray")
         self.tray_install_btn = ttk.Button(base_control, text="", style="Action.TButton", command=self._install_tray_support)
         self.tray_install_btn.grid(row=2, column=5, sticky="w", padx=(0, 4), pady=(8, 0))
-        self._bind_i18n(self.tray_install_btn, "text", "Zainstaluj tray", "Install tray")
+        self._bind_i18n(self.tray_install_btn, "text", "🧩 Zainstaluj tray", "🧩 Install tray")
 
         base_control.columnconfigure(0, weight=0)
         base_control.columnconfigure(1, weight=0)
@@ -2319,7 +2518,7 @@ class TimeSpecialistApp(tk.Tk):
                     "zone": "Zone",
                     "time": "Time",
                     "date": "Date",
-                    "repeat": "Active",
+                    "repeat": "Kind",
                     "duration": "Duration",
                     "sound": "Sound",
                     "enabled": "Status",
@@ -2330,7 +2529,7 @@ class TimeSpecialistApp(tk.Tk):
                     "zone": "Strefa",
                     "time": "Godzina",
                     "date": "Data",
-                    "repeat": "Aktywny",
+                    "repeat": "Rodzaj",
                     "duration": "Długość",
                     "sound": "Dźwięk",
                     "enabled": "Status",
@@ -2406,7 +2605,7 @@ class TimeSpecialistApp(tk.Tk):
         self.search_entry.bind("<Return>", self._on_search_enter)
         self.search_button = ttk.Button(search_bar, text="", style="Action.TButton", command=self._run_search)
         self.search_button.grid(row=0, column=2)
-        self._bind_i18n(self.search_button, "text", "Szukaj", "Search")
+        self._bind_i18n(self.search_button, "text", "🔎 Szukaj", "🔎 Search")
 
         ttk.Label(search_bar, textvariable=self.status_var, style="SmallInfo.TLabel", wraplength=980).grid(row=1, column=0, columnspan=3, sticky="w", pady=(8, 0))
 
@@ -2455,15 +2654,15 @@ class TimeSpecialistApp(tk.Tk):
 
         self.search_set_base_btn = ttk.Button(detail_card, text="", style="Action.TButton", command=self._set_selected_as_base_zone)
         self.search_set_base_btn.grid(row=2, column=0, sticky="w", pady=(12, 0))
-        self._bind_i18n(self.search_set_base_btn, "text", "Ustaw wynik jako strefę bazową", "Set result as base zone")
+        self._bind_i18n(self.search_set_base_btn, "text", "📍 Ustaw wynik jako strefę bazową", "📍 Set result as base zone")
 
         self.search_hints_label = ttk.Label(detail_card, text="", style="SmallInfo.TLabel", justify="left")
         self.search_hints_label.grid(row=3, column=0, sticky="sw", pady=(14, 0))
         self._bind_i18n(
             self.search_hints_label,
             "text",
-            "Wskazówki:\n- miasto: Warszawa / New York / Tokyo\n- kraj: Poland / Polska / United States\n- kod ISO: PL, US, JP\n- wpisz skrót lub offset: EST, CET, JST, UTC+1",
-            "Tips:\n- city: Warsaw / New York / Tokyo\n- country: Poland / Polska / United States\n- ISO code: PL, US, JP\n- enter abbreviation or offset: EST, CET, JST, UTC+1",
+            "Wskazówki:\n- miasto: Warszawa / Nowy Jork / Tokio\n- kraj: Polska / Stany Zjednoczone / Japonia\n- kod ISO: PL, US, JP\n- wpisz skrót lub offset: EST, CET, JST, UTC+1",
+            "Tips:\n- city: Warsaw / New York / Tokyo\n- country: Poland / United States / Japan\n- ISO code: PL, US, JP\n- enter abbreviation or offset: EST, CET, JST, UTC+1",
         )
 
     def _build_universal_tab(self) -> None:
@@ -2514,6 +2713,7 @@ class TimeSpecialistApp(tk.Tk):
         root = ttk.Frame(self.converter_tab, style="Card.TFrame", padding=12)
         root.pack(fill="both", expand=True)
         root.columnconfigure(0, weight=1)
+        root.rowconfigure(3, weight=1)
 
         self.converter_title_label = ttk.Label(root, text="", style="CardTitle.TLabel")
         self.converter_title_label.grid(row=0, column=0, sticky="w")
@@ -2521,56 +2721,74 @@ class TimeSpecialistApp(tk.Tk):
 
         controls = ttk.Frame(root, style="Card.TFrame", padding=8)
         controls.grid(row=1, column=0, sticky="ew", pady=(8, 0))
-        for col in range(6):
-            controls.columnconfigure(col, weight=1 if col in (1, 3, 5) else 0)
+        controls.columnconfigure(0, weight=1)
+        controls.columnconfigure(1, weight=1)
 
-        self.converter_source_time_label = ttk.Label(controls, text="", style="SmallInfo.TLabel")
-        self.converter_source_time_label.grid(row=0, column=0, sticky="w")
+        source_box = ttk.Frame(controls, style="Card.TFrame", padding=10)
+        source_box.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        source_box.columnconfigure(1, weight=1)
+        self.converter_source_title = ttk.Label(source_box, text="", style="CardTitle.TLabel")
+        self.converter_source_title.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
+        self._bind_i18n(self.converter_source_title, "text", "Źródło", "Source")
+
+        self.converter_source_time_label = ttk.Label(source_box, text="", style="SmallInfo.TLabel")
+        self.converter_source_time_label.grid(row=1, column=0, sticky="w")
         self._bind_i18n(self.converter_source_time_label, "text", "Czas źródłowy:", "Source time:")
-        self.converter_input_entry = ttk.Entry(controls, textvariable=self.converter_input_var, style="Search.TEntry")
-        self.converter_input_entry.grid(row=0, column=1, sticky="ew", padx=(6, 14))
+        self.converter_input_entry = ttk.Entry(source_box, textvariable=self.converter_input_var, style="Search.TEntry")
+        self.converter_input_entry.grid(row=1, column=1, sticky="ew", padx=(6, 0))
         self.converter_input_entry.bind("<KeyRelease>", self._on_converter_field_change)
 
-        self.converter_source_zone_label = ttk.Label(controls, text="", style="SmallInfo.TLabel")
-        self.converter_source_zone_label.grid(row=0, column=2, sticky="w")
+        self.converter_source_zone_label = ttk.Label(source_box, text="", style="SmallInfo.TLabel")
+        self.converter_source_zone_label.grid(row=2, column=0, sticky="w", pady=(10, 0))
         self._bind_i18n(self.converter_source_zone_label, "text", "Strefa źródła:", "Source zone:")
         self.converter_source_entry = ttk.Combobox(
-            controls,
+            source_box,
             textvariable=self.converter_source_zone_var,
             values=self.city_zone_values,
             style="Glass.TCombobox",
             state="normal",
         )
-        self.converter_source_entry.grid(row=0, column=3, sticky="ew", padx=(6, 14))
+        self.converter_source_entry.grid(row=2, column=1, sticky="ew", padx=(6, 0), pady=(10, 0))
         self.converter_source_entry.bind("<KeyRelease>", self._on_converter_field_change)
         self._register_autocomplete(self.converter_source_entry, self.city_zone_values)
 
-        self.converter_target_zone_label = ttk.Label(controls, text="", style="SmallInfo.TLabel")
-        self.converter_target_zone_label.grid(row=0, column=4, sticky="w")
+        target_box = ttk.Frame(controls, style="Card.TFrame", padding=10)
+        target_box.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+        target_box.columnconfigure(1, weight=1)
+        self.converter_target_title = ttk.Label(target_box, text="", style="CardTitle.TLabel")
+        self.converter_target_title.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
+        self._bind_i18n(self.converter_target_title, "text", "Cel", "Target")
+
+        self.converter_base_radio = ttk.Radiobutton(target_box, text="", variable=self.converter_target_mode_var, value="base", command=self._on_converter_mode_change)
+        self.converter_base_radio.grid(row=1, column=0, columnspan=2, sticky="w")
+        self._bind_i18n(self.converter_base_radio, "text", "Konwertuj do czasu bazowego", "Convert to base time")
+        self.converter_manual_radio = ttk.Radiobutton(target_box, text="", variable=self.converter_target_mode_var, value="manual", command=self._on_converter_mode_change)
+        self.converter_manual_radio.grid(row=2, column=0, columnspan=2, sticky="w", pady=(6, 0))
+        self._bind_i18n(self.converter_manual_radio, "text", "Konwertuj do strefy manualnej", "Convert to manual zone")
+
+        self.converter_target_zone_label = ttk.Label(target_box, text="", style="SmallInfo.TLabel")
+        self.converter_target_zone_label.grid(row=3, column=0, sticky="w", pady=(10, 0))
         self._bind_i18n(self.converter_target_zone_label, "text", "Cel (manualnie):", "Target (manual):")
         self.converter_target_entry = ttk.Combobox(
-            controls,
+            target_box,
             textvariable=self.converter_target_zone_var,
             values=self.city_zone_values,
             style="Glass.TCombobox",
             state="normal",
         )
-        self.converter_target_entry.grid(row=0, column=5, sticky="ew", padx=(6, 0))
+        self.converter_target_entry.grid(row=3, column=1, sticky="ew", padx=(6, 0), pady=(10, 0))
         self.converter_target_entry.bind("<KeyRelease>", self._on_converter_field_change)
         self._register_autocomplete(self.converter_target_entry, self.city_zone_values)
 
-        self.converter_base_radio = ttk.Radiobutton(controls, text="", variable=self.converter_target_mode_var, value="base", command=self._on_converter_mode_change)
-        self.converter_base_radio.grid(row=1, column=0, columnspan=2, sticky="w", pady=(10, 0))
-        self._bind_i18n(self.converter_base_radio, "text", "Konwertuj do czasu bazowego", "Convert to base time")
-        self.converter_manual_radio = ttk.Radiobutton(controls, text="", variable=self.converter_target_mode_var, value="manual", command=self._on_converter_mode_change)
-        self.converter_manual_radio.grid(row=1, column=2, columnspan=2, sticky="w", pady=(10, 0))
-        self._bind_i18n(self.converter_manual_radio, "text", "Konwertuj do strefy manualnej", "Convert to manual zone")
-        self.converter_live_check = ttk.Checkbutton(controls, text="", variable=self.converter_live_var, command=lambda: self._run_converter(silent=True))
-        self.converter_live_check.grid(row=1, column=4, sticky="w", pady=(10, 0))
+        self.converter_live_check = ttk.Checkbutton(target_box, text="", variable=self.converter_live_var, command=lambda: self._run_converter(silent=True))
+        self.converter_live_check.grid(row=4, column=0, sticky="w", pady=(10, 0))
         self._bind_i18n(self.converter_live_check, "text", "Auto odświeżanie", "Auto refresh")
-        self.converter_calc_button = ttk.Button(controls, text="", style="Action.TButton", command=lambda: self._run_converter(silent=False))
-        self.converter_calc_button.grid(row=1, column=5, sticky="e", pady=(10, 0))
-        self._bind_i18n(self.converter_calc_button, "text", "Przelicz", "Convert")
+
+        actions = ttk.Frame(controls, style="Card.TFrame")
+        actions.grid(row=1, column=0, columnspan=2, sticky="e", pady=(10, 0))
+        self.converter_calc_button = ttk.Button(actions, text="", style="Action.TButton", command=lambda: self._run_converter(silent=False))
+        self.converter_calc_button.grid(row=0, column=0, sticky="e")
+        self._bind_i18n(self.converter_calc_button, "text", "🧮 Przelicz", "🧮 Convert")
 
         self.converter_hint_label = ttk.Label(
             root,
@@ -2627,7 +2845,7 @@ class TimeSpecialistApp(tk.Tk):
 
         self.compare_run_btn = ttk.Button(controls, text="", style="Action.TButton", command=self._run_comparison)
         self.compare_run_btn.grid(row=0, column=4, sticky="e")
-        self._bind_i18n(self.compare_run_btn, "text", "Porównaj", "Compare")
+        self._bind_i18n(self.compare_run_btn, "text", "⚖ Porównaj", "⚖ Compare")
 
         self.compare_ref_time_label = ttk.Label(controls, text="", style="SmallInfo.TLabel")
         self.compare_ref_time_label.grid(row=1, column=0, sticky="w", pady=(10, 0))
@@ -2900,8 +3118,8 @@ class TimeSpecialistApp(tk.Tk):
     def _build_map_tab(self) -> None:
         root = ttk.Frame(self.map_tab, style="Root.TFrame")
         root.pack(fill="both", expand=True)
-        root.columnconfigure(0, weight=5)
-        root.columnconfigure(1, weight=1)
+        root.columnconfigure(0, weight=1)
+        root.columnconfigure(1, weight=0)
         root.rowconfigure(1, weight=1)
 
         header = ttk.Frame(root, style="Card.TFrame", padding=12)
@@ -2932,11 +3150,8 @@ class TimeSpecialistApp(tk.Tk):
         self.world_map_canvas = tk.Canvas(map_canvas_frame, highlightthickness=0)
         self.world_map_canvas.grid(row=0, column=0, sticky="nsew")
         self.world_map_vscroll = ttk.Scrollbar(map_canvas_frame, orient="vertical", command=self.world_map_canvas.yview)
-        self.world_map_vscroll.grid(row=0, column=1, sticky="ns")
         self.world_map_hscroll = ttk.Scrollbar(map_canvas_frame, orient="horizontal", command=self.world_map_canvas.xview)
-        self.world_map_hscroll.grid(row=1, column=0, sticky="ew")
         self.world_map_canvas.configure(yscrollcommand=self.world_map_vscroll.set, xscrollcommand=self.world_map_hscroll.set)
-        ttk.Frame(map_canvas_frame, style="Card.TFrame").grid(row=1, column=1)
 
         def _on_map_wheel(event: tk.Event) -> None:
             if not hasattr(self, "world_map_canvas"):
@@ -2956,18 +3171,22 @@ class TimeSpecialistApp(tk.Tk):
 
         side = ttk.Frame(root, style="Card.TFrame", padding=12)
         side.grid(row=1, column=1, sticky="nsew", padx=(8, 0))
-        side.configure(width=320)
+        side.configure(width=220)
         side.grid_propagate(False)
         side.columnconfigure(0, weight=1)
         side.rowconfigure(1, weight=1)
         self.map_side_title = ttk.Label(side, text="", style="CardTitle.TLabel")
         self.map_side_title.grid(row=0, column=0, sticky="w")
         self._bind_i18n(self.map_side_title, "text", "🌐 Podgląd miast świata", "🌐 World city snapshot")
-        self.map_side_text = tk.Text(side, wrap="word", relief="flat", borderwidth=0, padx=8, pady=8, font=("Bahnschrift", 12))
+        self.map_side_title.configure(justify="left", wraplength=180)
+        self.map_side_text = tk.Text(side, wrap="word", relief="flat", borderwidth=0, padx=8, pady=8, font=("Bahnschrift", 11))
         self.map_side_text.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
-        side_scroll = ttk.Scrollbar(side, orient="vertical", command=self.map_side_text.yview)
-        side_scroll.grid(row=1, column=1, sticky="ns", pady=(8, 0))
-        self.map_side_text.configure(yscrollcommand=side_scroll.set, state="disabled")
+        self.map_side_text.tag_configure("heading", font=("Bahnschrift", 12, "bold"))
+        self.map_side_scroll = ttk.Scrollbar(side, orient="vertical", command=self.map_side_text.yview)
+        self.map_side_scroll.grid(row=1, column=1, sticky="ns", pady=(8, 0))
+        self.map_side_text.configure(yscrollcommand=self.map_side_scroll.set, state="disabled")
+        side.bind("<Configure>", self._refresh_map_side_layout)
+        self.map_side_text.bind("<Configure>", self._refresh_map_side_layout)
         self._draw_world_map_tab()
 
     def _get_world_map_image(self, target_width: int, target_height: int) -> tk.PhotoImage | None:
@@ -3011,10 +3230,8 @@ class TimeSpecialistApp(tk.Tk):
         canvas.delete("all")
         view_width = max(canvas.winfo_width(), 320)
         view_height = max(canvas.winfo_height(), 240)
-        preferred_width = 1200
-        preferred_height = 680
-        width = max(view_width, preferred_width)
-        height = max(view_height, preferred_height)
+        width = view_width
+        height = view_height
         canvas.configure(scrollregion=(0, 0, width, height))
 
         top = str(self.theme_palette.get("canvas_top", "#1B2747"))
@@ -3135,8 +3352,9 @@ class TimeSpecialistApp(tk.Tk):
         base_lon_left, base_lon_right = offset_band_bounds(base_offset_rounded)
         highlight_x0 = lon_to_x(base_lon_left)
         highlight_x1 = lon_to_x(base_lon_right)
-        highlight_color = blend_hex(str(self.theme_palette.get("accent", "#4D7FD4")), "#FFFFFF", 0.45)
-        canvas.create_rectangle(highlight_x0, draw_top, highlight_x1, draw_bottom, fill=highlight_color, outline=blend_hex(highlight_color, "#FFFFFF", 0.2), width=2, stipple="gray25")
+        highlight_color = "#FFD84D"
+        highlight_fill = blend_hex(highlight_color, "#FFF7C2", 0.25)
+        canvas.create_rectangle(highlight_x0, draw_top, highlight_x1, draw_bottom, fill=highlight_fill, outline=blend_hex(highlight_color, "#FFFFFF", 0.18), width=2, stipple="gray25")
 
         grid_color = blend_hex(str(self.theme_palette.get("muted", "#C4D8F2")), bottom, 0.55)
         for lon in range(-180, 181, 15):
@@ -3189,7 +3407,7 @@ class TimeSpecialistApp(tk.Tk):
             pad_x, pad_y = 6, 4
             box_w = text_width + 2 * pad_x
             box_h = text_height + 2 * pad_y
-            offsets = [(0, -28), (0, 28), (26, -16), (-26, -16), (26, 16), (-26, 16)]
+            offsets = [(0, -28), (0, 28), (28, -16), (-28, -16), (28, 16), (-28, 16), (-44, 0), (44, 0)]
             bounds_left = max(4, draw_left)
             bounds_right = min(width - 4, draw_right)
             bounds_top = max(4, draw_top)
@@ -3209,8 +3427,10 @@ class TimeSpecialistApp(tk.Tk):
                 if not overlap:
                     placed.append((x0, y0, x1, y1))
                     return cx + ox, cy + oy, box_w, box_h
-            placed.append((cx - box_w / 2, cy - box_h / 2, cx + box_w / 2, cy + box_h / 2))
-            return cx, cy + 24, box_w, box_h
+            fallback_x = min(max(cx, bounds_left + box_w / 2), bounds_right - box_w / 2)
+            fallback_y = min(max(cy + 24, bounds_top + box_h / 2), bounds_bottom - box_h / 2)
+            placed.append((fallback_x - box_w / 2, fallback_y - box_h / 2, fallback_x + box_w / 2, fallback_y + box_h / 2))
+            return fallback_x, fallback_y, box_w, box_h
 
         for city_name, zone_id in WORLD_HIGHLIGHTS:
             lon = MAP_CITY_LONGITUDE.get(city_name)
@@ -3218,6 +3438,7 @@ class TimeSpecialistApp(tk.Tk):
             if lon is None:
                 continue
             city_now = self.engine.convert(now_utc, zone_id)
+            city_label = self._city_display_name(city_name)
             x = draw_left + ((lon + 180.0) / 360.0) * draw_width
             y = draw_top + ((90.0 - lat) / 180.0) * draw_height
             dot_radius = max(4, min(7, int(draw_width / 240)))
@@ -3230,7 +3451,7 @@ class TimeSpecialistApp(tk.Tk):
                 outline=blend_hex(str(self.theme_palette.get("clock_border", "#A9C9FF")), "#FFFFFF", 0.35),
                 width=1,
             )
-            label_x, label_y, box_w, box_h = place_label(x, y, f"{city_name}\n{city_now:%H:%M}")
+            label_x, label_y, box_w, box_h = place_label(x, y, f"{city_label}\n{city_now:%H:%M}")
             box_left = label_x - box_w / 2
             box_top = label_y - box_h / 2
             box_right = box_left + box_w
@@ -3245,11 +3466,12 @@ class TimeSpecialistApp(tk.Tk):
                 fill=label_bg,
                 outline=blend_hex(label_bg, "#FFFFFF", 0.2),
                 width=1,
+                stipple="gray50",
             )
             canvas.create_text(
                 label_x,
                 label_y,
-                text=f"{city_name}\n{city_now:%H:%M}",
+                text=f"{city_label}\n{city_now:%H:%M}",
                 fill=str(self.theme_palette.get("heading", "#F8FAFC")),
                 font=font,
                 justify="center",
@@ -3259,15 +3481,16 @@ class TimeSpecialistApp(tk.Tk):
             lines: list[str] = []
             for city_name, zone_id in WORLD_HIGHLIGHTS:
                 city_now = self.engine.convert(now_utc, zone_id)
-                lines.append(f"• {city_name}: {city_now:%Y-%m-%d %H:%M:%S} ({city_now.tzname()})")
+                lines.append(f"• {self._city_display_name(city_name)} — {city_now:%H:%M:%S} ({city_now.tzname()})")
             self.map_side_text.configure(state="normal")
             self.map_side_text.delete("1.0", "end")
             if self.language_var.get() == "en":
-                self.map_side_text.insert("end", "Live world clock snapshot\n\n", ())
+                self.map_side_text.insert("end", "Live world clock snapshot\n\n", ("heading",))
             else:
-                self.map_side_text.insert("end", "Podgląd światowych czasów na żywo\n\n", ())
+                self.map_side_text.insert("end", "Podgląd światowych czasów na żywo\n\n", ("heading",))
             self.map_side_text.insert("end", "\n".join(lines))
             self.map_side_text.configure(state="disabled")
+            self._refresh_map_side_layout()
 
     def _build_tiles_tab(self) -> None:
         self.tiles_root = ttk.Frame(self.tiles_tab, style="Root.TFrame")
@@ -3295,7 +3518,7 @@ class TimeSpecialistApp(tk.Tk):
 
         self.tiles_add_btn = ttk.Button(self.tiles_controls, text="", style="Action.TButton", command=self._add_tile_from_query)
         self.tiles_add_btn.grid(row=0, column=2, sticky="e", padx=(0, 8))
-        self._bind_i18n(self.tiles_add_btn, "text", "Dodaj z miasta", "Add from city")
+        self._bind_i18n(self.tiles_add_btn, "text", "➕ Dodaj z miasta", "➕ Add from city")
 
         self.tiles_session_label = ttk.Label(self.tiles_controls, text="", style="SmallInfo.TLabel")
         self.tiles_session_label.grid(row=0, column=3, sticky="w")
@@ -3303,35 +3526,36 @@ class TimeSpecialistApp(tk.Tk):
         self.tile_session_combo = ttk.Combobox(
             self.tiles_controls,
             textvariable=self.tile_session_var,
-            values=list(SESSION_PRESETS.keys()),
+            values=[],
             state="readonly",
             width=34,
             style="Glass.TCombobox",
         )
         self.tile_session_combo.grid(row=0, column=4, sticky="w", padx=(8, 10))
+        self._refresh_session_combo_values()
 
         self.tiles_add_session_btn = ttk.Button(self.tiles_controls, text="", style="Action.TButton", command=self._add_tile_from_session)
         self.tiles_add_session_btn.grid(row=0, column=5, sticky="e", padx=(0, 8))
-        self._bind_i18n(self.tiles_add_session_btn, "text", "Dodaj z sesji", "Add from session")
+        self._bind_i18n(self.tiles_add_session_btn, "text", "🏛 Dodaj z sesji", "🏛 Add from session")
         self.tiles_add_base_btn = ttk.Button(self.tiles_controls, text="", style="Action.TButton", command=self._add_base_tile)
         self.tiles_add_base_btn.grid(row=0, column=6, sticky="e", padx=(0, 8))
-        self._bind_i18n(self.tiles_add_base_btn, "text", "Dodaj bazowy", "Add base tile")
+        self._bind_i18n(self.tiles_add_base_btn, "text", "🕒 Dodaj bazowy", "🕒 Add base tile")
         self.tiles_add_defaults_btn = ttk.Button(self.tiles_controls, text="", style="Action.TButton", command=self._add_default_tiles)
         self.tiles_add_defaults_btn.grid(row=0, column=7, sticky="e", padx=(0, 8))
-        self._bind_i18n(self.tiles_add_defaults_btn, "text", "Sesje domyślne", "Default sessions")
+        self._bind_i18n(self.tiles_add_defaults_btn, "text", "📦 Sesje domyślne", "📦 Default sessions")
         self.tiles_clear_btn = ttk.Button(self.tiles_controls, text="", style="Action.TButton", command=self._clear_tiles)
         self.tiles_clear_btn.grid(row=0, column=8, sticky="e", padx=(0, 8))
-        self._bind_i18n(self.tiles_clear_btn, "text", "Wyczyść", "Clear")
+        self._bind_i18n(self.tiles_clear_btn, "text", "🧹 Wyczyść", "🧹 Clear")
         self.tiles_grid_btn = ttk.Button(self.tiles_controls, text="", style="Action.TButton", command=self._align_tiles_to_grid)
         self.tiles_grid_btn.grid(row=0, column=9, sticky="e", padx=(0, 8))
-        self._bind_i18n(self.tiles_grid_btn, "text", "Wyrównaj do siatki", "Align to grid")
+        self._bind_i18n(self.tiles_grid_btn, "text", "🧲 Wyrównaj do siatki", "🧲 Align to grid")
         self.tiles_fullscreen_btn = ttk.Button(self.tiles_controls, text="", style="Action.TButton", command=self._toggle_fullscreen)
         self.tiles_fullscreen_btn.grid(row=0, column=10, sticky="e")
-        self._bind_i18n(self.tiles_fullscreen_btn, "text", "Pełny ekran kafelków", "Tile fullscreen")
+        self._bind_i18n(self.tiles_fullscreen_btn, "text", "🖥 Pełny ekran kafelków", "🖥 Tile fullscreen")
 
         ttk.Label(self.tiles_controls, textvariable=self.tile_status_var, style="SmallInfo.TLabel", wraplength=1260).grid(row=1, column=0, columnspan=11, sticky="w", pady=(8, 0))
 
-        self.tiles_ticking_check = ttk.Checkbutton(self.tiles_controls, text="", variable=self.tile_ticking_var)
+        self.tiles_ticking_check = ttk.Checkbutton(self.tiles_controls, text="", variable=self.tile_ticking_var, command=self._on_tile_ticking_toggle)
         self.tiles_ticking_check.grid(row=2, column=0, columnspan=2, sticky="w", pady=(6, 0))
         self._bind_i18n(self.tiles_ticking_check, "text", "Tykanie (tylko aktywna sesja)", "Ticking (only active session)")
         self.tiles_session_sound_check = ttk.Checkbutton(self.tiles_controls, text="", variable=self.session_sound_enabled_var)
@@ -3394,7 +3618,7 @@ class TimeSpecialistApp(tk.Tk):
         self.alarms_tree.heading("zone", text=self._t("Strefa", "Zone"))
         self.alarms_tree.heading("time", text=self._t("Godzina", "Time"))
         self.alarms_tree.heading("date", text=self._t("Data", "Date"))
-        self.alarms_tree.heading("repeat", text=self._t("Aktywny", "Active"))
+        self.alarms_tree.heading("repeat", text=self._t("Rodzaj", "Kind"))
         self.alarms_tree.heading("duration", text=self._t("Długość", "Duration"))
         self.alarms_tree.heading("sound", text=self._t("Dźwięk", "Sound"))
         self.alarms_tree.heading("enabled", text=self._t("Status", "Status"))
@@ -3402,12 +3626,12 @@ class TimeSpecialistApp(tk.Tk):
         self.alarms_tree.column("zone", width=170, anchor="w")
         self.alarms_tree.column("time", width=90, anchor="center")
         self.alarms_tree.column("date", width=110, anchor="center")
-        self.alarms_tree.column("repeat", width=110, anchor="center")
+        self.alarms_tree.column("repeat", width=150, anchor="center")
         self.alarms_tree.column("duration", width=90, anchor="center")
         self.alarms_tree.column("sound", width=200, anchor="w")
         self.alarms_tree.column("enabled", width=90, anchor="center")
         self.alarms_tree.bind("<<TreeviewSelect>>", self._on_alarm_select)
-        self.alarms_tree.bind("<Button-1>", self._on_alarm_tree_click, add="+")
+        self._configure_alarm_tree_tags()
 
         alarm_scroll = ttk.Scrollbar(alarms_card, orient="vertical", command=self.alarms_tree.yview)
         alarm_scroll.grid(row=1, column=1, sticky="ns", pady=(8, 0))
@@ -3486,7 +3710,7 @@ class TimeSpecialistApp(tk.Tk):
         self.alarm_script_entry.grid(row=4, column=1, columnspan=2, sticky="ew", padx=(6, 8), pady=(10, 0))
         self.alarm_script_browse_btn = ttk.Button(form, text="", style="Action.TButton", command=self._browse_alarm_script)
         self.alarm_script_browse_btn.grid(row=4, column=3, sticky="e", pady=(10, 0))
-        self._bind_i18n(self.alarm_script_browse_btn, "text", "Wybierz", "Browse")
+        self._bind_i18n(self.alarm_script_browse_btn, "text", "📂 Wybierz", "📂 Browse")
 
         self.alarms_pause_check = ttk.Checkbutton(form, text="", variable=self.alarms_paused_var, command=self._on_alarms_pause_toggle)
         self.alarms_pause_check.grid(row=5, column=0, sticky="w", pady=(10, 0))
@@ -3496,22 +3720,22 @@ class TimeSpecialistApp(tk.Tk):
         buttons.grid(row=5, column=1, columnspan=3, sticky="e", pady=(10, 0))
         self.alarm_add_btn = ttk.Button(buttons, text="", style="Action.TButton", command=self._add_alarm)
         self.alarm_add_btn.grid(row=0, column=0, padx=(0, 6))
-        self._bind_i18n(self.alarm_add_btn, "text", "Dodaj", "Add")
+        self._bind_i18n(self.alarm_add_btn, "text", "➕ Dodaj", "➕ Add")
         self.alarm_update_btn = ttk.Button(buttons, text="", style="Action.TButton", command=self._update_alarm)
         self.alarm_update_btn.grid(row=0, column=1, padx=(0, 6))
-        self._bind_i18n(self.alarm_update_btn, "text", "Aktualizuj", "Update")
+        self._bind_i18n(self.alarm_update_btn, "text", "💾 Aktualizuj", "💾 Update")
         self.alarm_toggle_btn = ttk.Button(buttons, text="", style="Action.TButton", command=self._toggle_alarm)
         self.alarm_toggle_btn.grid(row=0, column=2, padx=(0, 6))
-        self._bind_i18n(self.alarm_toggle_btn, "text", "Włącz/Wyłącz", "Toggle")
+        self._bind_i18n(self.alarm_toggle_btn, "text", "⏻ Włącz/Wyłącz", "⏻ Toggle")
         self.alarm_remove_btn = ttk.Button(buttons, text="", style="Action.TButton", command=self._remove_alarm)
         self.alarm_remove_btn.grid(row=0, column=3, padx=(0, 6))
-        self._bind_i18n(self.alarm_remove_btn, "text", "Usuń", "Remove")
+        self._bind_i18n(self.alarm_remove_btn, "text", "🗑 Usuń", "🗑 Remove")
         self.alarm_test_btn = ttk.Button(buttons, text="", style="Action.TButton", command=self._test_alarm_sound)
         self.alarm_test_btn.grid(row=0, column=4, padx=(0, 6))
-        self._bind_i18n(self.alarm_test_btn, "text", "Test dźwięku", "Test sound")
+        self._bind_i18n(self.alarm_test_btn, "text", "🔔 Test dźwięku", "🔔 Test sound")
         self.alarm_clear_btn = ttk.Button(buttons, text="", style="Action.TButton", command=self._clear_alarm_fields)
         self.alarm_clear_btn.grid(row=0, column=5)
-        self._bind_i18n(self.alarm_clear_btn, "text", "Wyczyść", "Clear")
+        self._bind_i18n(self.alarm_clear_btn, "text", "🧹 Wyczyść", "🧹 Clear")
 
         self.alarm_status_label = ttk.Label(alarms_card, textvariable=self.alarm_status_var, style="AlarmStatus.TLabel", wraplength=1100, justify="left")
         self.alarm_status_label.grid(row=3, column=0, sticky="w", pady=(8, 0))
@@ -3521,10 +3745,12 @@ class TimeSpecialistApp(tk.Tk):
             self.alarm_help_label,
             "text",
             "Opis pól: nazwa = etykieta alarmu, strefa = gdzie ma zadzwonić, data opcjonalna (dzień/miesiąc/rok). "
-            "Powtarzanie codzienne ustawisz w tabeli (kolumna Aktywny) dla alarmów bez daty. "
+            "Kolumna Rodzaj pokazuje ∞ dla alarmu bez daty, Jednorazowy dla alarmu z datą "
+            "oraz dopisek / Skrypt, gdy uruchamiany jest dodatkowy skrypt. "
             "Pauza alarmów i timerów wstrzymuje całą sekcję bez zmiany statusów. Skrypt uruchamia się wraz z dźwiękiem.",
             "Field help: label = alarm name, zone = where it should ring, date optional (day/month/year), "
-            "daily repeat is set in the table (Active column) for alarms without a date. "
+            "the Kind column shows ∞ for alarms without a date, One-off for alarms with a date, "
+            "and adds / Script when an extra script is attached. "
             "Pause alarms & timers stops the whole section without changing statuses. Script runs together with the sound.",
         )
         self._set_alarm_pause_status_text(mark_dirty=False)
@@ -3546,13 +3772,13 @@ class TimeSpecialistApp(tk.Tk):
         sw_buttons.grid(row=2, column=0, sticky="w", pady=(10, 0))
         sw_start = ttk.Button(sw_buttons, text="", style="Action.TButton", command=self._start_stopwatch)
         sw_start.grid(row=0, column=0, padx=(0, 6))
-        self._bind_i18n(sw_start, "text", "Start", "Start")
+        self._bind_i18n(sw_start, "text", "▶ Start", "▶ Start")
         sw_stop = ttk.Button(sw_buttons, text="", style="Action.TButton", command=self._stop_stopwatch)
         sw_stop.grid(row=0, column=1, padx=(0, 6))
-        self._bind_i18n(sw_stop, "text", "Stop", "Stop")
+        self._bind_i18n(sw_stop, "text", "■ Stop", "■ Stop")
         sw_reset = ttk.Button(sw_buttons, text="", style="Action.TButton", command=self._reset_stopwatch)
         sw_reset.grid(row=0, column=2)
-        self._bind_i18n(sw_reset, "text", "Reset", "Reset")
+        self._bind_i18n(sw_reset, "text", "↺ Reset", "↺ Reset")
 
         timer_card = ttk.Frame(right, style="Card.TFrame", padding=12)
         timer_card.grid(row=1, column=0, sticky="nsew")
@@ -3582,7 +3808,7 @@ class TimeSpecialistApp(tk.Tk):
         self.timer_script_entry.grid(row=1, column=1, columnspan=2, sticky="ew", padx=(6, 12), pady=(10, 0))
         self.timer_script_browse_btn = ttk.Button(timer_controls, text="", style="Action.TButton", command=self._browse_timer_script)
         self.timer_script_browse_btn.grid(row=1, column=3, sticky="e", pady=(10, 0))
-        self._bind_i18n(self.timer_script_browse_btn, "text", "Wybierz", "Browse")
+        self._bind_i18n(self.timer_script_browse_btn, "text", "📂 Wybierz", "📂 Browse")
 
         self.timer_repeat_check = ttk.Checkbutton(timer_controls, text="", variable=self.timer_repeat_var)
         self.timer_repeat_check.grid(row=2, column=0, sticky="w", pady=(10, 0))
@@ -3594,13 +3820,13 @@ class TimeSpecialistApp(tk.Tk):
         timer_buttons.grid(row=3, column=0, sticky="w", pady=(8, 0))
         timer_start = ttk.Button(timer_buttons, text="", style="Action.TButton", command=self._start_timer)
         timer_start.grid(row=0, column=0, padx=(0, 6))
-        self._bind_i18n(timer_start, "text", "Start", "Start")
+        self._bind_i18n(timer_start, "text", "▶ Start", "▶ Start")
         timer_stop = ttk.Button(timer_buttons, text="", style="Action.TButton", command=self._stop_timer)
         timer_stop.grid(row=0, column=1, padx=(0, 6))
-        self._bind_i18n(timer_stop, "text", "Stop", "Stop")
+        self._bind_i18n(timer_stop, "text", "■ Stop", "■ Stop")
         timer_reset = ttk.Button(timer_buttons, text="", style="Action.TButton", command=self._reset_timer)
         timer_reset.grid(row=0, column=2)
-        self._bind_i18n(timer_reset, "text", "Reset", "Reset")
+        self._bind_i18n(timer_reset, "text", "↺ Reset", "↺ Reset")
 
         self.timer_help_label = ttk.Label(timer_card, text="", style="SmallInfo.TLabel", wraplength=520, justify="left")
         self.timer_help_label.grid(row=4, column=0, sticky="w", pady=(6, 0))
@@ -3694,7 +3920,7 @@ class TimeSpecialistApp(tk.Tk):
             ttk.Label(card, text=url, style="SmallInfo.TLabel").grid(row=2, column=0, sticky="w", pady=(6, 0))
             open_btn = ttk.Button(card, text="", style="Action.TButton", command=lambda u=url: webbrowser.open(u))
             open_btn.grid(row=0, column=1, rowspan=3, sticky="e", padx=(12, 0))
-            self._bind_i18n(open_btn, "text", "Otwórz", "Open")
+            self._bind_i18n(open_btn, "text", "↗ Otwórz", "↗ Open")
             _bind_mousewheel(card)
 
     def _on_tiles_canvas_configure(self, event: tk.Event) -> None:
@@ -3718,21 +3944,27 @@ class TimeSpecialistApp(tk.Tk):
             time_txt = str(alarm.get("time", ""))
             date_txt = str(alarm.get("date", "")).strip()
             enabled = bool(alarm.get("enabled", True))
-            status = self._t("Włączony", "Enabled") if enabled else self._t("Wyłączony", "Disabled")
+            status = self._t("● Włączony", "● Enabled") if enabled else self._t("● Wyłączony", "● Disabled")
             duration = str(alarm.get("duration", "20"))
             sound_id = str(alarm.get("sound_id", DEFAULT_ALARM_SOUND_ID))
             sound_label = self._sound_display_for_id(sound_id)
-            if date_txt:
-                repeat_display = self._t("Jednorazowy", "One-off")
-            else:
-                repeat_daily = bool(alarm.get("repeat_daily", False))
-                repeat_display = self._t("☑ TAK", "☑ YES") if repeat_daily else self._t("☐ NIE", "☐ NO")
+            repeat_display = self._alarm_kind_display(alarm)
+            status_tag = "alarm_enabled" if enabled else "alarm_disabled"
             self.alarms_tree.insert(
                 "",
                 "end",
                 iid=str(alarm_id),
                 values=(label, zone, time_txt, date_txt or "-", repeat_display, duration, sound_label, status),
+                tags=(status_tag,),
             )
+
+    def _alarm_kind_display(self, alarm: dict[str, object]) -> str:
+        has_date = bool(str(alarm.get("date", "")).strip())
+        has_script = bool(str(alarm.get("script", "")).strip())
+        kind_label = self._t("Jednorazowy", "One-off") if has_date else "∞"
+        if has_script:
+            kind_label = f"{kind_label} / {self._t('Skrypt', 'Script')}"
+        return kind_label
 
     def _get_alarm_by_id(self, alarm_id: int) -> dict[str, object] | None:
         for alarm in self.alarms:
@@ -3767,49 +3999,11 @@ class TimeSpecialistApp(tk.Tk):
             self.alarm_month_var.set("")
             self.alarm_year_var.set("")
         self.alarm_enabled_var.set(bool(alarm.get("enabled", True)))
-        if alarm_date_str:
-            self.alarm_repeat_daily_var.set(False)
-        else:
-            self.alarm_repeat_daily_var.set(bool(alarm.get("repeat_daily", False)))
         self.alarm_duration_var.set(str(alarm.get("duration", "20")))
         self.alarm_script_var.set(str(alarm.get("script", "")))
         sound_id = str(alarm.get("sound_id", DEFAULT_ALARM_SOUND_ID))
         self.alarm_sound_id_var.set(sound_id)
         self._refresh_alarm_sound_values()
-
-    def _on_alarm_tree_click(self, event: tk.Event) -> None:
-        if not hasattr(self, "alarms_tree"):
-            return
-        region = self.alarms_tree.identify("region", event.x, event.y)
-        if region != "cell":
-            return
-        column = self.alarms_tree.identify_column(event.x)
-        row_id = self.alarms_tree.identify_row(event.y)
-        if not row_id or not column:
-            return
-        columns = self.alarms_tree["columns"]
-        try:
-            col_index = int(column.replace("#", "")) - 1
-        except ValueError:
-            return
-        if col_index < 0 or col_index >= len(columns):
-            return
-        if columns[col_index] != "repeat":
-            return
-        try:
-            alarm_id = int(row_id)
-        except (TypeError, ValueError):
-            return
-        alarm = self._get_alarm_by_id(alarm_id)
-        if not alarm:
-            return
-        if str(alarm.get("date", "")).strip():
-            return
-        alarm["repeat_daily"] = not bool(alarm.get("repeat_daily", False))
-        self.alarm_repeat_daily_var.set(bool(alarm.get("repeat_daily", False)))
-        self._refresh_alarm_tree()
-        self.alarms_tree.selection_set(row_id)
-        self._mark_settings_dirty()
 
     def _add_alarm(self) -> None:
         label = self.alarm_label_var.get().strip() or self._t("Alarm", "Alarm")
@@ -3840,7 +4034,7 @@ class TimeSpecialistApp(tk.Tk):
         except ValueError:
             self.alarm_status_var.set(self._t("Niepoprawna długość alarmu.", "Invalid alarm duration."))
             return
-        repeat_daily = True if not date_raw else False
+        repeat_daily = not bool(date_raw)
         script_path = self.alarm_script_var.get().strip()
         sound_id = self._resolve_alarm_sound_id()
         alarm_id = self.next_alarm_id
@@ -3898,9 +4092,7 @@ class TimeSpecialistApp(tk.Tk):
         except ValueError:
             self.alarm_status_var.set(self._t("Niepoprawna długość alarmu.", "Invalid alarm duration."))
             return
-        repeat_daily = bool(self.alarm_repeat_daily_var.get())
-        if date_raw:
-            repeat_daily = False
+        repeat_daily = not bool(date_raw)
         script_path = self.alarm_script_var.get().strip()
         sound_id = self._resolve_alarm_sound_id()
         alarm.update(
@@ -3955,7 +4147,6 @@ class TimeSpecialistApp(tk.Tk):
         self.alarm_month_var.set("")
         self.alarm_year_var.set("")
         self.alarm_enabled_var.set(True)
-        self.alarm_repeat_daily_var.set(True)
         self.alarm_duration_var.set("20")
         self.alarm_sound_id_var.set(DEFAULT_ALARM_SOUND_ID)
         self.alarm_script_var.set("")
@@ -4095,8 +4286,8 @@ class TimeSpecialistApp(tk.Tk):
                 continue
             date_raw = str(alarm.get("date", "")).strip()
             target_date = parse_alarm_date(date_raw) if date_raw else None
-            repeat_daily = bool(alarm.get("repeat_daily", False))
-            if target_date and now_zone.date() != target_date and not repeat_daily:
+            repeat_daily = not bool(target_date)
+            if target_date and now_zone.date() != target_date:
                 continue
             hour, minute, second = parsed_time
             if now_zone.hour == hour and now_zone.minute == minute and now_zone.second == second:
@@ -4113,7 +4304,7 @@ class TimeSpecialistApp(tk.Tk):
                 if script_path:
                     self._run_alarm_script(script_path)
                 self.alarm_status_var.set(self._t(f"Alarm: {alarm.get('label', '')}", f"Alarm: {alarm.get('label', '')}"))
-                if (target_date and not repeat_daily) or (target_date is None and not repeat_daily):
+                if target_date and not repeat_daily:
                     alarm["enabled"] = False
                     self._refresh_alarm_tree()
                     self._mark_settings_dirty()
@@ -4307,37 +4498,51 @@ class TimeSpecialistApp(tk.Tk):
     def _update_ticking_state(self, any_active: bool) -> None:
         self.any_session_active = any_active
         if not self.tile_ticking_var.get() or self.sound_muted or not SOUND_TICKING.is_file():
-            self._stop_ticking()
+            self._stop_ticking(stop_sound=True)
             return
         if any_active:
             self._schedule_ticking()
         else:
-            self._stop_ticking()
+            self._stop_ticking(stop_sound=True)
 
     def _schedule_ticking(self) -> None:
         if self.ticking_after_id is not None:
             return
         now = datetime.now().astimezone()
         delay = max(5, 1000 - int(now.microsecond / 1000))
-        self.ticking_after_id = self.after(delay, self._tick_once)
+        generation = self.ticking_generation
+        self.ticking_after_id = self.after(delay, lambda gen=generation: self._tick_once(gen))
 
-    def _tick_once(self) -> None:
+    def _tick_once(self, generation: int) -> None:
+        if generation != self.ticking_generation:
+            return
         self.ticking_after_id = None
         if not self.tile_ticking_var.get() or self.sound_muted or not self.any_session_active:
             return
         try:
+            winsound.PlaySound(None, winsound.SND_PURGE)
             winsound.PlaySound(str(SOUND_TICKING), winsound.SND_FILENAME | winsound.SND_ASYNC)
         except RuntimeError:
             return
         self._schedule_ticking()
 
-    def _stop_ticking(self) -> None:
+    def _stop_ticking(self, stop_sound: bool = False) -> None:
+        self.ticking_generation += 1
         if self.ticking_after_id is not None:
             try:
                 self.after_cancel(self.ticking_after_id)
             except tk.TclError:
                 pass
             self.ticking_after_id = None
+        if stop_sound:
+            try:
+                winsound.PlaySound(None, winsound.SND_PURGE)
+            except RuntimeError:
+                pass
+
+    def _on_tile_ticking_toggle(self) -> None:
+        self._update_ticking_state(self.any_session_active)
+        self._mark_settings_dirty()
 
     def _configure_phase_tags(self) -> None:
         mappings = (
@@ -4413,9 +4618,7 @@ class TimeSpecialistApp(tk.Tk):
             if not any(sound.get("id") == sound_id for sound in ALARM_SOUND_LIBRARY):
                 sound_id = DEFAULT_ALARM_SOUND_ID
             script_path = str(row.get("script", "")).strip()
-            repeat_daily = bool(row.get("repeat_daily", False))
-            if date_raw:
-                repeat_daily = False
+            repeat_daily = not bool(date_raw)
             label = str(row.get("label", "")).strip() or self._t("Alarm", "Alarm")
             enabled = bool(row.get("enabled", True))
             alarm_id = row.get("id")
@@ -4499,6 +4702,8 @@ class TimeSpecialistApp(tk.Tk):
             "language": self.language_var.get(),
             "theme": self.theme_name,
             "auto_night": bool(self.auto_night_var.get()),
+            "auto_night_start": normalize_hhmm(self.auto_night_start_var.get(), AUTO_NIGHT_DEFAULT_START),
+            "auto_night_stop": normalize_hhmm(self.auto_night_stop_var.get(), AUTO_NIGHT_DEFAULT_STOP),
             "search_query": self.search_query_var.get(),
             "converter_input": self.converter_input_var.get(),
             "converter_source_zone": self.converter_source_zone_var.get(),
@@ -4510,7 +4715,7 @@ class TimeSpecialistApp(tk.Tk):
             "compare_reference_time": self.compare_reference_time_var.get(),
             "compare_reference_zone": self.compare_reference_zone_var.get(),
             "tile_query": self.tile_query_var.get(),
-            "tile_session": self.tile_session_var.get(),
+            "tile_session": self._resolve_session_key(self.tile_session_var.get()),
             "tiles": self._snapshot_tiles(),
             "session_sound_enabled": bool(self.session_sound_enabled_var.get()),
             "tile_ticking": bool(self.tile_ticking_var.get()),
@@ -4566,6 +4771,8 @@ class TimeSpecialistApp(tk.Tk):
             self.tile_session_var,
             self.theme_var,
             self.auto_night_var,
+            self.auto_night_start_var,
+            self.auto_night_stop_var,
             self.session_sound_enabled_var,
             self.tile_ticking_var,
             self.alarm_sound_id_var,
@@ -4609,12 +4816,12 @@ class TimeSpecialistApp(tk.Tk):
         if not hasattr(self, "tray_install_btn"):
             return
         if self.tray_install_in_progress:
-            self.tray_install_btn.configure(text=self._t("Instalacja...", "Installing..."), state="disabled")
+            self.tray_install_btn.configure(text=self._t("⏳ Instalacja...", "⏳ Installing..."), state="disabled")
             return
         if PYSTRAY_AVAILABLE:
-            self.tray_install_btn.configure(text=self._t("Tray gotowy", "Tray ready"), state="disabled")
+            self.tray_install_btn.configure(text=self._t("✅ Tray gotowy", "✅ Tray ready"), state="disabled")
         else:
-            self.tray_install_btn.configure(text=self._t("Zainstaluj tray", "Install tray"), state="normal")
+            self.tray_install_btn.configure(text=self._t("🧩 Zainstaluj tray", "🧩 Install tray"), state="normal")
 
     def _load_tray_modules(self) -> bool:
         global pystray, Image, PYSTRAY_AVAILABLE
@@ -4781,7 +4988,7 @@ class TimeSpecialistApp(tk.Tk):
                 winsound.PlaySound(None, winsound.SND_ASYNC)
             except RuntimeError:
                 pass
-            self._stop_ticking()
+            self._stop_ticking(stop_sound=True)
         else:
             if self.tile_ticking_var.get() and self.any_session_active:
                 self._schedule_ticking()
@@ -5201,14 +5408,15 @@ class TimeSpecialistApp(tk.Tk):
             zone_id = str(preset.get("zone", ""))
             if not zone_id:
                 continue
-            self._add_tile(zone_id, session_key, session_key, silent=True, tile_x=x, tile_y=y, tile_w=tile_w, tile_h=tile_h)
+            self._add_tile(zone_id, self._session_display_name(session_key), session_key, silent=True, tile_x=x, tile_y=y, tile_w=tile_w, tile_h=tile_h)
             x += tile_w + gap
         self.tile_status_var.set(self._t("Wczytano domyślne kafelki sesji tradingowych.", "Loaded default trading-session tiles."))
         self._mark_settings_dirty()
 
     def _add_base_tile(self) -> None:
         zone_id = self._get_base_zone_id()
-        self._add_tile(zone_id, self._t(f"Bazowy: {zone_id}", f"Base: {zone_id}"), self.tile_session_var.get())
+        session_key = self._resolve_session_key(self.tile_session_var.get())
+        self._add_tile(zone_id, self._t(f"Bazowy: {zone_id}", f"Base: {zone_id}"), session_key)
 
     def _add_tile_from_query(self) -> None:
         query = self.tile_query_var.get().strip()
@@ -5226,7 +5434,7 @@ class TimeSpecialistApp(tk.Tk):
         self.tile_query_var.set("")
 
     def _add_tile_from_session(self) -> None:
-        session_key = self.tile_session_var.get()
+        session_key = self._resolve_session_key(self.tile_session_var.get())
         preset = SESSION_PRESETS.get(session_key)
         if not preset:
             self.tile_status_var.set(self._t("Wybierz sesję giełdową do dodania.", "Select a trading session to add."))
@@ -5235,7 +5443,7 @@ class TimeSpecialistApp(tk.Tk):
         if not zone_id:
             self.tile_status_var.set(self._t("Brak strefy dla wybranej sesji.", "Selected session has no zone."))
             return
-        self._add_tile(zone_id, session_key, session_key)
+        self._add_tile(zone_id, self._session_display_name(session_key), session_key)
 
     def _align_tiles_to_grid(self) -> None:
         if not self.tile_cards:
@@ -5294,7 +5502,7 @@ class TimeSpecialistApp(tk.Tk):
         title_label.grid(row=0, column=0, sticky="w")
         title_label.configure(cursor="fleur")
 
-        remove_btn = ttk.Button(frame, text=self._t("Usuń", "Remove"), style="Action.TButton", command=lambda cid=card_id: self._remove_tile(cid))
+        remove_btn = ttk.Button(frame, text=self._t("🗑 Usuń", "🗑 Remove"), style="Action.TButton", command=lambda cid=card_id: self._remove_tile(cid))
         remove_btn.grid(row=0, column=1, sticky="e")
 
         canvas = tk.Canvas(
@@ -6078,7 +6286,7 @@ class TimeSpecialistApp(tk.Tk):
         open_tile = open_dt.astimezone(now_tile.tzinfo)
         close_tile = close_dt.astimezone(now_tile.tzinfo)
         status_text = self._t("AKTYWNA", "ACTIVE") if active else self._t("NIEAKTYWNA", "INACTIVE")
-        text = f"{card.session_key}: {open_txt}-{close_txt} ({status_text})"
+        text = f"{self._session_display_name(card.session_key)}: {open_txt}-{close_txt} ({status_text})"
         return text, active, open_tile, close_tile
 
     def _draw_clock(self, canvas: tk.Canvas, now_dt: datetime, phase_key: str, session_open: datetime | None, session_close: datetime | None, session_active: bool) -> None:
@@ -6204,7 +6412,7 @@ class TimeSpecialistApp(tk.Tk):
             target = self.engine.convert(base_now, zone_id)
             phase_key = day_phase(target.hour)
             phase_txt = phase_label(phase_key, self.language_var.get())
-            self.world_tree.item(zone_id, values=(place_name, zone_id, target.strftime("%Y-%m-%d %H:%M:%S"), target.tzname() or "-", format_offset(target.utcoffset()), format_diff((target.utcoffset() or timedelta(0)) - base_offset), phase_txt), tags=(phase_key,))
+            self.world_tree.item(zone_id, values=(self._city_display_name(place_name), zone_id, target.strftime("%Y-%m-%d %H:%M:%S"), target.tzname() or "-", format_offset(target.utcoffset()), format_diff((target.utcoffset() or timedelta(0)) - base_offset), phase_txt), tags=(phase_key,))
 
     def _refresh_search_table(self, base_now: datetime) -> None:
         base_offset = base_now.utcoffset() or timedelta(0)
@@ -6271,6 +6479,7 @@ class TimeSpecialistApp(tk.Tk):
 
             session_text, session_active, open_tile, close_tile = self._session_state_for_card(card, now_tile)
 
+            card.title_label.configure(text=self._tile_display_title(card))
             card.digital_label.configure(text=now_tile.strftime("%H:%M:%S"))
             card.meta_label.configure(
                 text=(
@@ -6306,6 +6515,7 @@ class TimeSpecialistApp(tk.Tk):
             phase_txt = phase_label(phase_key, self.language_var.get())
             session_text, session_active, open_tile, close_tile = self._session_state_for_card(card, now_tile)
 
+            card.title_label.configure(text=self._tile_display_title(card))
             card.digital_label.configure(text=now_tile.strftime("%H:%M:%S"))
             card.meta_label.configure(
                 text=(

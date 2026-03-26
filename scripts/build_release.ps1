@@ -16,8 +16,8 @@ function Resolve-Makensis {
   $cmd = Get-Command "makensis" -ErrorAction SilentlyContinue
   if ($cmd) { return $cmd.Path }
   $candidates = @(
-    "C:\\Program Files (x86)\\NSIS\\makensis.exe",
-    "C:\\Program Files\\NSIS\\makensis.exe"
+    "C:\Program Files (x86)\NSIS\makensis.exe",
+    "C:\Program Files\NSIS\makensis.exe"
   )
   foreach ($c in $candidates) { if (Test-Path $c) { return $c } }
   return $null
@@ -49,6 +49,16 @@ if ($makensis) {
   Write-Warning "NSIS (makensis) not found. Installer EXE not created."
 }
 
+# Build scripts bundle for reproducible releases
+$buildScriptZip = Join-Path $root "release\build-scripts.zip"
+if (Test-Path $buildScriptZip) { Remove-Item -Force $buildScriptZip }
+Compress-Archive -Path @(
+  (Join-Path $root "scripts"),
+  (Join-Path $root "installer"),
+  (Join-Path $root "WorldTimeSpecialist.spec"),
+  (Join-Path $root "requirements.txt")
+) -DestinationPath $buildScriptZip -Force
+
 # Checksums
 if (Test-Path release\checksums.txt) { Remove-Item -Force release\checksums.txt }
 "WorldTimeSpecialist-Portable.exe" | ForEach-Object {
@@ -60,4 +70,8 @@ if (Test-Path release\checksums.txt) { Remove-Item -Force release\checksums.txt 
 if (Test-Path "release\WorldTimeSpecialist-Setup.exe") {
   $h = Get-FileHash "release\WorldTimeSpecialist-Setup.exe" -Algorithm SHA256
   "{0}  {1}" -f $h.Hash, "WorldTimeSpecialist-Setup.exe" | Out-File -FilePath release\checksums.txt -Encoding ASCII -Append
+}
+if (Test-Path "release\build-scripts.zip") {
+  $h = Get-FileHash "release\build-scripts.zip" -Algorithm SHA256
+  "{0}  {1}" -f $h.Hash, "build-scripts.zip" | Out-File -FilePath release\checksums.txt -Encoding ASCII -Append
 }
