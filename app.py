@@ -4338,8 +4338,10 @@ class TimeSpecialistApp(tk.Tk):
     def _test_alarm_sound(self) -> None:
         sound_id = self._resolve_alarm_sound_id()
         path = self._alarm_sound_path(sound_id, self.alarm_sound_file_var.get().strip())
-        self._play_sound_for_duration(path, 4, loop_sound=bool(self.alarm_loop_var.get()))
-        self.alarm_status_var.set(self._t("Odtworzono dźwięk alarmu.", "Played alarm sound."))
+        # Test playback is always one-shot; loop applies only to real alarms.
+        self._stop_sound()
+        self._play_sound(path)
+        self.alarm_status_var.set(self._t("Test dźwięku alarmu (raz).", "Testing alarm sound (one-shot)."))
 
     def _start_stopwatch(self) -> None:
         if self.stopwatch_running:
@@ -4585,14 +4587,23 @@ class TimeSpecialistApp(tk.Tk):
             return False
         self.current_mci_alias = alias
         self._mci_send(f"seek {alias} to start")
-        play_cmd = f"play {alias} repeat" if loop else f"play {alias} from 0"
-        if not self._mci_send(play_cmd):
-            self._close_mci_audio()
-            return False
+        if loop:
+            # Some MCI drivers accept only one of these repeat syntaxes.
+            if not self._mci_send(f"play {alias} repeat"):
+                if not self._mci_send(f"play {alias} from 0 repeat"):
+                    self._close_mci_audio()
+                    return False
+        else:
+            if not self._mci_send(f"play {alias} from 0"):
+                self._close_mci_audio()
+                return False
         return True
 
     def _play_sound(self, path: Path | None) -> None:
         if self.sound_muted:
+            return
+        # Do not interrupt currently ringing timed alarm/timer playback.
+        if self.sound_stop_after_id is not None:
             return
         self.sound_playback_token += 1
         self._cancel_pending_sound_stop()
@@ -4788,15 +4799,15 @@ class TimeSpecialistApp(tk.Tk):
         self.any_session_active = any_active
         # Keep ticking suspended while a timed sound (alarm/timer) is playing.
         if self.sound_stop_after_id is not None:
-            self._stop_ticking(stop_sound=True)
+            self._stop_ticking(stop_sound=False)
             return
         if not self.tile_ticking_var.get() or self.sound_muted or not SOUND_TICKING.is_file():
-            self._stop_ticking(stop_sound=True)
+            self._stop_ticking(stop_sound=False)
             return
         if any_active:
             self._schedule_ticking()
         else:
-            self._stop_ticking(stop_sound=True)
+            self._stop_ticking(stop_sound=False)
 
     def _schedule_ticking(self) -> None:
         if self.ticking_after_id is not None:
@@ -4813,8 +4824,8 @@ class TimeSpecialistApp(tk.Tk):
         if not self.tile_ticking_var.get() or self.sound_muted or not self.any_session_active or self.sound_stop_after_id is not None:
             return
         try:
-            winsound.PlaySound(None, winsound.SND_PURGE)
-            winsound.PlaySound(str(SOUND_TICKING), winsound.SND_FILENAME | winsound.SND_ASYNC)
+            # SND_NOSTOP prevents ticking from cutting alarm/session playback.
+            winsound.PlaySound(str(SOUND_TICKING), winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NOSTOP)
         except RuntimeError:
             return
         self._schedule_ticking()
