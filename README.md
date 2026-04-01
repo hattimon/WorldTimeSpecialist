@@ -4,8 +4,8 @@ A modern desktop **Python (tkinter)** app for time zones, world clocks, market s
 
 ## ⬇️ Download
 
-[![Download Installer](https://img.shields.io/badge/Download-Installer-blue?style=for-the-badge&logo=windows)](https://github.com/hattimon/WorldTimeSpecialist/releases/download/v1.0.1/WorldTimeSpecialist-Setup.exe)
-[![Download Portable](https://img.shields.io/badge/Download-Portable%20EXE-3b82f6?style=for-the-badge&logo=windows)](https://github.com/hattimon/WorldTimeSpecialist/releases/download/v1.0.1/WorldTimeSpecialist-Portable.exe)
+[![Download Installer](https://img.shields.io/badge/Download-Installer-blue?style=for-the-badge&logo=windows)](https://github.com/hattimon/WorldTimeSpecialist/releases/download/v1.0.2/WorldTimeSpecialist-Setup.exe)
+[![Download Portable](https://img.shields.io/badge/Download-Portable%20EXE-3b82f6?style=for-the-badge&logo=windows)](https://github.com/hattimon/WorldTimeSpecialist/releases/download/v1.0.2/WorldTimeSpecialist-Portable.exe)
 [![All Releases](https://img.shields.io/badge/All%20Releases-GitHub-111827?style=for-the-badge&logo=github)](https://github.com/hattimon/WorldTimeSpecialist/releases)
 
 ## 🎬 Demo
@@ -106,4 +106,5 @@ scripts\build_release.ps1
 
 - Dźwięki: SoundJay (https://www.soundjay.com/)
 - Mapa świata: NASA Blue Marble (public domain)
+
 

@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import calendar
+import ctypes
 import json
 import math
 import os
@@ -1171,6 +1172,131 @@ def seasonal_offset_description(zone_id: str, year: int, language: str = "pl") -
     return f"zima: {jan_name} {jan_off} | lato: {jul_name} {jul_off}"
 
 
+def _find_offset_transition_utc(zone: ZoneInfo, start_utc: datetime, end_utc: datetime, offset_before: timedelta) -> datetime:
+    lo = start_utc
+    hi = end_utc
+    while (hi - lo) > timedelta(seconds=1):
+        mid = lo + (hi - lo) / 2
+        mid_offset = mid.astimezone(zone).utcoffset() or timedelta(0)
+        if mid_offset == offset_before:
+            lo = mid
+        else:
+            hi = mid
+    return hi.replace(microsecond=0)
+
+
+def _zoneinfo_dst_transitions(zone_id: str, start_utc: datetime, end_utc: datetime) -> list[tuple[datetime, timedelta, timedelta]]:
+    try:
+        zone = ZoneInfo(zone_id)
+    except Exception:
+        return []
+
+    cursor = start_utc.astimezone(timezone.utc)
+    end = end_utc.astimezone(timezone.utc)
+    step = timedelta(hours=6)
+    transitions: list[tuple[datetime, timedelta, timedelta]] = []
+
+    current_offset = cursor.astimezone(zone).utcoffset() or timedelta(0)
+    while cursor < end:
+        next_cursor = min(cursor + step, end)
+        next_offset = next_cursor.astimezone(zone).utcoffset() or timedelta(0)
+        if next_offset != current_offset:
+            transition_utc = _find_offset_transition_utc(zone, cursor, next_cursor, current_offset)
+            after_offset = transition_utc.astimezone(zone).utcoffset() or timedelta(0)
+            if after_offset != current_offset:
+                transitions.append((transition_utc, current_offset, after_offset))
+            current_offset = after_offset
+        else:
+            current_offset = next_offset
+        cursor = next_cursor
+
+    return transitions
+
+
+def _fallback_dst_transitions_for_year(zone_id: str, year: int) -> list[tuple[datetime, timedelta, timedelta]]:
+    rule = FALLBACK_ZONE_RULES.get(zone_id)
+    if not rule:
+        return []
+    std_offset = int(rule.get("std", 0))
+    dst_offset = int(rule.get("dst", std_offset))
+    if std_offset == dst_offset:
+        return []
+
+    std_td = timedelta(minutes=std_offset)
+    dst_td = timedelta(minutes=dst_offset)
+    rule_key = str(rule.get("rule", ""))
+    transitions: list[tuple[datetime, timedelta, timedelta]] = []
+
+    if rule_key == "eu":
+        start_utc = datetime(year, 3, _last_weekday(year, 3, 6).day, 1, 0, tzinfo=timezone.utc)
+        end_utc = datetime(year, 10, _last_weekday(year, 10, 6).day, 1, 0, tzinfo=timezone.utc)
+        transitions.append((start_utc, std_td, dst_td))
+        transitions.append((end_utc, dst_td, std_td))
+    elif rule_key == "us":
+        start_utc = _local_transition_utc(year, 3, 6, 2, 2, std_offset)
+        end_utc = _local_transition_utc(year, 11, 6, 1, 2, dst_offset)
+        transitions.append((start_utc, std_td, dst_td))
+        transitions.append((end_utc, dst_td, std_td))
+    elif rule_key == "aus":
+        end_utc = _local_transition_utc(year, 4, 6, 1, 3, dst_offset)
+        start_utc = _local_transition_utc(year, 10, 6, 1, 2, std_offset)
+        transitions.append((end_utc, dst_td, std_td))
+        transitions.append((start_utc, std_td, dst_td))
+    elif rule_key == "nz":
+        end_utc = _local_transition_utc(year, 4, 6, 1, 3, dst_offset)
+        start_utc = _local_transition_utc(year, 9, 6, -1, 2, std_offset)
+        transitions.append((end_utc, dst_td, std_td))
+        transitions.append((start_utc, std_td, dst_td))
+
+    return sorted(transitions, key=lambda item: item[0])
+
+
+def _format_transition_local(transition_utc: datetime, zone_id: str) -> tuple[datetime, str, timedelta]:
+    try:
+        zone = ZoneInfo(zone_id)
+        local = transition_utc.astimezone(zone)
+        return local, local.tzname() or "-", local.utcoffset() or timedelta(0)
+    except Exception:
+        offset_minutes, abbr = fallback_offset(transition_utc + timedelta(seconds=1), zone_id)
+        local = (transition_utc + timedelta(minutes=offset_minutes)).replace(tzinfo=timezone(timedelta(minutes=offset_minutes), name=abbr))
+        return local, abbr, timedelta(minutes=offset_minutes)
+
+
+def next_dst_transition_summary(zone_id: str, reference_dt: datetime, language: str = "pl") -> tuple[str, str]:
+    ref_utc = reference_dt.astimezone(timezone.utc)
+    transitions = _zoneinfo_dst_transitions(zone_id, ref_utc - timedelta(days=2), ref_utc + timedelta(days=740))
+    if not transitions:
+        for year in range(ref_utc.year, ref_utc.year + 3):
+            transitions.extend(_fallback_dst_transitions_for_year(zone_id, year))
+        transitions.sort(key=lambda item: item[0])
+
+    next_to_summer: str | None = None
+    next_to_winter: str | None = None
+    for transition_utc, before_offset, after_offset in transitions:
+        if transition_utc < ref_utc:
+            continue
+        local_dt, abbr, offset = _format_transition_local(transition_utc, zone_id)
+        summary = f"{local_dt:%Y-%m-%d %H:%M} {abbr} ({format_offset(offset)})"
+        if after_offset > before_offset and next_to_summer is None:
+            next_to_summer = summary
+        elif after_offset < before_offset and next_to_winter is None:
+            next_to_winter = summary
+        if next_to_summer and next_to_winter:
+            break
+
+    if language == "en":
+        if next_to_summer is None:
+            next_to_summer = "no scheduled winter -> summer change"
+        if next_to_winter is None:
+            next_to_winter = "no scheduled summer -> winter change"
+    else:
+        if next_to_summer is None:
+            next_to_summer = "brak zaplanowanej zmiany z zimowego na letni"
+        if next_to_winter is None:
+            next_to_winter = "brak zaplanowanej zmiany z letniego na zimowy"
+    return next_to_summer, next_to_winter
+
+
 def _read_tab_file(filename: str) -> list[str]:
     try:
         import importlib.resources as resources
@@ -1808,6 +1934,9 @@ class TimeSpecialistApp(tk.Tk):
         self.session_state_cache: dict[int, bool] = {}
         self.ticking_after_id: str | None = None
         self.ticking_generation = 0
+        self.sound_stop_after_id: str | None = None
+        self.sound_playback_token = 0
+        self.current_mci_alias: str | None = None
         self.any_session_active = False
         self.sound_muted = bool(self._loaded_settings.get("sound_muted", False))
         self.tray_icon: object | None = None
@@ -1832,6 +1961,7 @@ class TimeSpecialistApp(tk.Tk):
         self.alarm_duration_var = tk.StringVar(value="20")
         self.alarm_sound_display_var = tk.StringVar(value="")
         self.alarm_sound_id_var = tk.StringVar(value=str(self._loaded_settings.get("alarm_sound_default", DEFAULT_ALARM_SOUND_ID)))
+        self.alarm_sound_file_var = tk.StringVar(value="")
         self.alarm_script_var = tk.StringVar(value="")
         self.alarm_status_var = tk.StringVar(value="")
 
@@ -3703,21 +3833,30 @@ class TimeSpecialistApp(tk.Tk):
         self.alarm_sound_combo.grid(row=3, column=1, columnspan=3, sticky="ew", padx=(6, 0), pady=(10, 0))
         self.alarm_sound_combo.bind("<<ComboboxSelected>>", self._on_alarm_sound_select)
 
+        alarm_sound_file_label = ttk.Label(form, text="", style="SmallInfo.TLabel")
+        alarm_sound_file_label.grid(row=4, column=0, sticky="w", pady=(10, 0))
+        self._bind_i18n(alarm_sound_file_label, "text", "Własny plik audio (opcjonalnie):", "Custom audio file (optional):")
+        self.alarm_sound_file_entry = ttk.Entry(form, textvariable=self.alarm_sound_file_var, style="Search.TEntry")
+        self.alarm_sound_file_entry.grid(row=4, column=1, columnspan=2, sticky="ew", padx=(6, 8), pady=(10, 0))
+        self.alarm_sound_file_btn = ttk.Button(form, text="", style="Action.TButton", command=self._browse_alarm_sound_file)
+        self.alarm_sound_file_btn.grid(row=4, column=3, sticky="e", pady=(10, 0))
+        self._bind_i18n(self.alarm_sound_file_btn, "text", "🎵 Wybierz", "🎵 Browse")
+
         alarm_script_label = ttk.Label(form, text="", style="SmallInfo.TLabel")
-        alarm_script_label.grid(row=4, column=0, sticky="w", pady=(10, 0))
+        alarm_script_label.grid(row=5, column=0, sticky="w", pady=(10, 0))
         self._bind_i18n(alarm_script_label, "text", "Skrypt (opcjonalnie):", "Script (optional):")
         self.alarm_script_entry = ttk.Entry(form, textvariable=self.alarm_script_var, style="Search.TEntry")
-        self.alarm_script_entry.grid(row=4, column=1, columnspan=2, sticky="ew", padx=(6, 8), pady=(10, 0))
+        self.alarm_script_entry.grid(row=5, column=1, columnspan=2, sticky="ew", padx=(6, 8), pady=(10, 0))
         self.alarm_script_browse_btn = ttk.Button(form, text="", style="Action.TButton", command=self._browse_alarm_script)
-        self.alarm_script_browse_btn.grid(row=4, column=3, sticky="e", pady=(10, 0))
+        self.alarm_script_browse_btn.grid(row=5, column=3, sticky="e", pady=(10, 0))
         self._bind_i18n(self.alarm_script_browse_btn, "text", "📂 Wybierz", "📂 Browse")
 
         self.alarms_pause_check = ttk.Checkbutton(form, text="", variable=self.alarms_paused_var, command=self._on_alarms_pause_toggle)
-        self.alarms_pause_check.grid(row=5, column=0, sticky="w", pady=(10, 0))
+        self.alarms_pause_check.grid(row=6, column=0, sticky="w", pady=(10, 0))
         self._bind_i18n(self.alarms_pause_check, "text", "Pauza alarmów i timerów", "Pause alarms & timers")
 
         buttons = ttk.Frame(form, style="Card.TFrame")
-        buttons.grid(row=5, column=1, columnspan=3, sticky="e", pady=(10, 0))
+        buttons.grid(row=6, column=1, columnspan=3, sticky="e", pady=(10, 0))
         self.alarm_add_btn = ttk.Button(buttons, text="", style="Action.TButton", command=self._add_alarm)
         self.alarm_add_btn.grid(row=0, column=0, padx=(0, 6))
         self._bind_i18n(self.alarm_add_btn, "text", "➕ Dodaj", "➕ Add")
@@ -3747,11 +3886,15 @@ class TimeSpecialistApp(tk.Tk):
             "Opis pól: nazwa = etykieta alarmu, strefa = gdzie ma zadzwonić, data opcjonalna (dzień/miesiąc/rok). "
             "Kolumna Rodzaj pokazuje ∞ dla alarmu bez daty, Jednorazowy dla alarmu z datą "
             "oraz dopisek / Skrypt, gdy uruchamiany jest dodatkowy skrypt. "
-            "Pauza alarmów i timerów wstrzymuje całą sekcję bez zmiany statusów. Skrypt uruchamia się wraz z dźwiękiem.",
+            "Pauza alarmów i timerów wstrzymuje całą sekcję bez zmiany statusów. "
+            "Własny plik audio (np. MP3) działa też na pętli do ustawionej długości alarmu. "
+            "Skrypt uruchamia się wraz z dźwiękiem.",
             "Field help: label = alarm name, zone = where it should ring, date optional (day/month/year), "
             "the Kind column shows ∞ for alarms without a date, One-off for alarms with a date, "
             "and adds / Script when an extra script is attached. "
-            "Pause alarms & timers stops the whole section without changing statuses. Script runs together with the sound.",
+            "Pause alarms & timers stops the whole section without changing statuses. "
+            "A custom audio file (e.g., MP3) also loops until the configured alarm duration ends. "
+            "Script runs together with the sound.",
         )
         self._set_alarm_pause_status_text(mark_dirty=False)
 
@@ -3947,7 +4090,11 @@ class TimeSpecialistApp(tk.Tk):
             status = self._t("● Włączony", "● Enabled") if enabled else self._t("● Wyłączony", "● Disabled")
             duration = str(alarm.get("duration", "20"))
             sound_id = str(alarm.get("sound_id", DEFAULT_ALARM_SOUND_ID))
-            sound_label = self._sound_display_for_id(sound_id)
+            sound_file = str(alarm.get("sound_file", "")).strip()
+            if sound_file:
+                sound_label = self._t("Własny: ", "Custom: ") + Path(sound_file).name
+            else:
+                sound_label = self._sound_display_for_id(sound_id)
             repeat_display = self._alarm_kind_display(alarm)
             status_tag = "alarm_enabled" if enabled else "alarm_disabled"
             self.alarms_tree.insert(
@@ -4000,6 +4147,7 @@ class TimeSpecialistApp(tk.Tk):
             self.alarm_year_var.set("")
         self.alarm_enabled_var.set(bool(alarm.get("enabled", True)))
         self.alarm_duration_var.set(str(alarm.get("duration", "20")))
+        self.alarm_sound_file_var.set(str(alarm.get("sound_file", "")))
         self.alarm_script_var.set(str(alarm.get("script", "")))
         sound_id = str(alarm.get("sound_id", DEFAULT_ALARM_SOUND_ID))
         self.alarm_sound_id_var.set(sound_id)
@@ -4034,6 +4182,13 @@ class TimeSpecialistApp(tk.Tk):
         except ValueError:
             self.alarm_status_var.set(self._t("Niepoprawna długość alarmu.", "Invalid alarm duration."))
             return
+        sound_file = self.alarm_sound_file_var.get().strip()
+        if sound_file:
+            sound_path = Path(sound_file).expanduser()
+            if not sound_path.is_file():
+                self.alarm_status_var.set(self._t("Nie znaleziono własnego pliku audio alarmu.", "Custom alarm audio file not found."))
+                return
+            sound_file = str(sound_path)
         repeat_daily = not bool(date_raw)
         script_path = self.alarm_script_var.get().strip()
         sound_id = self._resolve_alarm_sound_id()
@@ -4050,6 +4205,7 @@ class TimeSpecialistApp(tk.Tk):
                 "repeat_daily": repeat_daily,
                 "duration": duration,
                 "sound_id": sound_id,
+                "sound_file": sound_file,
                 "script": script_path,
             }
         )
@@ -4092,6 +4248,13 @@ class TimeSpecialistApp(tk.Tk):
         except ValueError:
             self.alarm_status_var.set(self._t("Niepoprawna długość alarmu.", "Invalid alarm duration."))
             return
+        sound_file = self.alarm_sound_file_var.get().strip()
+        if sound_file:
+            sound_path = Path(sound_file).expanduser()
+            if not sound_path.is_file():
+                self.alarm_status_var.set(self._t("Nie znaleziono własnego pliku audio alarmu.", "Custom alarm audio file not found."))
+                return
+            sound_file = str(sound_path)
         repeat_daily = not bool(date_raw)
         script_path = self.alarm_script_var.get().strip()
         sound_id = self._resolve_alarm_sound_id()
@@ -4105,6 +4268,7 @@ class TimeSpecialistApp(tk.Tk):
                 "repeat_daily": repeat_daily,
                 "duration": duration,
                 "sound_id": sound_id,
+                "sound_file": sound_file,
                 "script": script_path,
             }
         )
@@ -4149,12 +4313,13 @@ class TimeSpecialistApp(tk.Tk):
         self.alarm_enabled_var.set(True)
         self.alarm_duration_var.set("20")
         self.alarm_sound_id_var.set(DEFAULT_ALARM_SOUND_ID)
+        self.alarm_sound_file_var.set("")
         self.alarm_script_var.set("")
         self._refresh_alarm_sound_values()
 
     def _test_alarm_sound(self) -> None:
         sound_id = self._resolve_alarm_sound_id()
-        path = self._sound_path_for_id(sound_id)
+        path = self._alarm_sound_path(sound_id, self.alarm_sound_file_var.get().strip())
         self._play_sound_for_duration(path, 4)
         self.alarm_status_var.set(self._t("Odtworzono dźwięk alarmu.", "Played alarm sound."))
 
@@ -4298,7 +4463,8 @@ class TimeSpecialistApp(tk.Tk):
                 self.alarm_last_fire[alarm_id] = key
                 duration = int(alarm.get("duration", 20) or 20)
                 sound_id = str(alarm.get("sound_id", DEFAULT_ALARM_SOUND_ID))
-                path = self._sound_path_for_id(sound_id)
+                sound_file = str(alarm.get("sound_file", "")).strip()
+                path = self._alarm_sound_path(sound_id, sound_file)
                 self._play_sound_for_duration(path, duration)
                 script_path = str(alarm.get("script", "")).strip()
                 if script_path:
@@ -4344,14 +4510,56 @@ class TimeSpecialistApp(tk.Tk):
         self.timer_remaining_seconds = remaining
         self.timer_remaining_var.set(format_hhmmss(remaining))
 
+    def _mci_send(self, command: str) -> bool:
+        try:
+            result = ctypes.windll.winmm.mciSendStringW(command, None, 0, 0)
+            return result == 0
+        except Exception:
+            return False
+
+    def _close_mci_audio(self) -> None:
+        alias = self.current_mci_alias
+        if not alias:
+            return
+        self._mci_send(f"stop {alias}")
+        self._mci_send(f"close {alias}")
+        self.current_mci_alias = None
+
+    def _play_audio_backend(self, path: Path | None, loop: bool) -> bool:
+        if not path or not path.is_file():
+            return False
+        suffix = path.suffix.lower()
+        if suffix == ".wav":
+            self._close_mci_audio()
+            flags = winsound.SND_FILENAME | winsound.SND_ASYNC
+            if loop:
+                flags |= winsound.SND_LOOP
+            try:
+                winsound.PlaySound(str(path), flags)
+            except RuntimeError:
+                return False
+            return True
+
+        self._close_mci_audio()
+        alias = f"wtsaudio_{self.sound_playback_token}"
+        escaped = str(path).replace('"', '""')
+        if not self._mci_send(f'open "{escaped}" alias {alias}'):
+            return False
+        self.current_mci_alias = alias
+        play_cmd = f"play {alias} repeat" if loop else f"play {alias}"
+        if not self._mci_send(play_cmd):
+            self._close_mci_audio()
+            return False
+        return True
+
     def _play_sound(self, path: Path | None) -> None:
         if self.sound_muted:
             return
+        self.sound_playback_token += 1
+        self._cancel_pending_sound_stop()
         self._stop_ticking()
         try:
-            if path and path.is_file():
-                winsound.PlaySound(str(path), winsound.SND_FILENAME | winsound.SND_ASYNC)
-            else:
+            if not self._play_audio_backend(path, loop=False):
                 winsound.MessageBeep(winsound.MB_ICONASTERISK)
         except RuntimeError:
             pass
@@ -4362,22 +4570,36 @@ class TimeSpecialistApp(tk.Tk):
         if self.sound_muted:
             return
         duration_seconds = max(1, int(duration_seconds))
+        self.sound_playback_token += 1
+        current_token = self.sound_playback_token
+        self._cancel_pending_sound_stop()
         self._stop_ticking()
         try:
-            if path and path.is_file():
-                winsound.PlaySound(str(path), winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_LOOP)
-            else:
+            if not self._play_audio_backend(path, loop=True):
                 winsound.MessageBeep(winsound.MB_ICONASTERISK)
         except RuntimeError:
             return
 
-        self.after(duration_seconds * 1000, self._stop_sound)
+        self.sound_stop_after_id = self.after(duration_seconds * 1000, lambda token=current_token: self._stop_sound(token))
 
-    def _stop_sound(self) -> None:
+    def _cancel_pending_sound_stop(self) -> None:
+        if self.sound_stop_after_id is None:
+            return
+        try:
+            self.after_cancel(self.sound_stop_after_id)
+        except tk.TclError:
+            pass
+        self.sound_stop_after_id = None
+
+    def _stop_sound(self, expected_token: int | None = None) -> None:
+        if expected_token is not None and expected_token != self.sound_playback_token:
+            return
+        self._cancel_pending_sound_stop()
         try:
             winsound.PlaySound(None, winsound.SND_PURGE)
         except RuntimeError:
             pass
+        self._close_mci_audio()
         if self.tile_ticking_var.get() and self.any_session_active and not self.sound_muted:
             self._schedule_ticking()
 
@@ -4386,6 +4608,21 @@ class TimeSpecialistApp(tk.Tk):
             if sound.get("id") == sound_id:
                 return SOUNDS_DIR / sound.get("file", "")
         return SOUND_ALARM
+
+    def _resolve_custom_sound_path(self, raw_path: str) -> Path | None:
+        raw = raw_path.strip()
+        if not raw:
+            return None
+        path = Path(raw).expanduser()
+        if path.is_file():
+            return path
+        return None
+
+    def _alarm_sound_path(self, sound_id: str, custom_sound_path: str) -> Path | None:
+        custom = self._resolve_custom_sound_path(custom_sound_path)
+        if custom is not None:
+            return custom
+        return self._sound_path_for_id(sound_id)
 
     def _sound_display_for_id(self, sound_id: str) -> str:
         for sound in ALARM_SOUND_LIBRARY:
@@ -4426,6 +4663,19 @@ class TimeSpecialistApp(tk.Tk):
     def _on_alarm_sound_select(self, _event: tk.Event | None = None) -> None:
         sound_id = self._resolve_alarm_sound_id()
         self.alarm_sound_id_var.set(sound_id)
+
+    def _browse_alarm_sound_file(self) -> None:
+        path = filedialog.askopenfilename(
+            title=self._t("Wybierz plik dźwięku alarmu", "Select custom alarm sound file"),
+            filetypes=[
+                ("Audio", "*.wav;*.mp3;*.wma;*.aac;*.m4a;*.ogg;*.flac"),
+                ("WAV", "*.wav"),
+                ("MP3", "*.mp3"),
+                ("All files", "*.*"),
+            ],
+        )
+        if path:
+            self.alarm_sound_file_var.set(path)
 
     def _browse_alarm_script(self) -> None:
         path = filedialog.askopenfilename(
@@ -4617,6 +4867,10 @@ class TimeSpecialistApp(tk.Tk):
             sound_id = str(row.get("sound_id", DEFAULT_ALARM_SOUND_ID)).strip() or DEFAULT_ALARM_SOUND_ID
             if not any(sound.get("id") == sound_id for sound in ALARM_SOUND_LIBRARY):
                 sound_id = DEFAULT_ALARM_SOUND_ID
+            sound_file = str(row.get("sound_file", "")).strip()
+            if sound_file:
+                sound_path = Path(sound_file).expanduser()
+                sound_file = str(sound_path) if sound_path.is_file() else ""
             script_path = str(row.get("script", "")).strip()
             repeat_daily = not bool(date_raw)
             label = str(row.get("label", "")).strip() or self._t("Alarm", "Alarm")
@@ -4638,6 +4892,7 @@ class TimeSpecialistApp(tk.Tk):
                     "repeat_daily": repeat_daily,
                     "duration": duration,
                     "sound_id": sound_id,
+                    "sound_file": sound_file,
                     "script": script_path,
                 }
             )
@@ -4776,6 +5031,7 @@ class TimeSpecialistApp(tk.Tk):
             self.session_sound_enabled_var,
             self.tile_ticking_var,
             self.alarm_sound_id_var,
+            self.alarm_sound_file_var,
             self.alarms_paused_var,
             self.minimize_on_start_var,
             self.fullscreen_auto_layout_var,
@@ -4796,6 +5052,7 @@ class TimeSpecialistApp(tk.Tk):
         if self.tile_focus_window is not None:
             self.tile_focus_window.destroy()
             self.tile_focus_window = None
+        self._stop_sound()
         self._stop_ticking()
         self._stop_tray_icon()
         self.destroy()
@@ -4984,10 +5241,7 @@ class TimeSpecialistApp(tk.Tk):
     def _set_muted(self, muted: bool) -> None:
         self.sound_muted = bool(muted)
         if self.sound_muted:
-            try:
-                winsound.PlaySound(None, winsound.SND_ASYNC)
-            except RuntimeError:
-                pass
+            self._stop_sound()
             self._stop_ticking(stop_sound=True)
         else:
             if self.tile_ticking_var.get() and self.any_session_active:
@@ -5183,6 +5437,7 @@ class TimeSpecialistApp(tk.Tk):
         phase_key = day_phase(now_target.hour)
         phase_txt = phase_label(phase_key, self.language_var.get())
         dst_text = self._t("TAK", "YES") if is_dst_active(now_target) else self._t("NIE", "NO")
+        dst_to_summer, dst_to_winter = next_dst_transition_summary(zone_id, now_target, self.language_var.get())
         full_source = self._source_for_zone(zone_id)
         self.search_source_full_var.set(wrap_source_text(full_source, width=90))
 
@@ -5201,6 +5456,8 @@ class TimeSpecialistApp(tk.Tk):
                 f"- profil sezonowy: {seasonal_offset_description(zone_id, now_target.year, language='pl')}\n",
                 f"- seasonal profile: {seasonal_offset_description(zone_id, now_target.year, language='en')}\n",
             ),
+            self._t(f"- zmiana z zimowego na letni: {dst_to_summer}\n", f"- winter -> summer DST switch: {dst_to_summer}\n"),
+            self._t(f"- zmiana z letniego na zimowy: {dst_to_winter}\n", f"- summer -> winter DST switch: {dst_to_winter}\n"),
             self._t(f"- pora dnia: {phase_txt}\n\n", f"- day phase: {phase_txt}\n\n"),
             self._t("Źródło dopasowania:\n", "Match source:\n"),
             f"{wrap_source_text(full_source, width=62)}",
@@ -5274,6 +5531,30 @@ class TimeSpecialistApp(tk.Tk):
 
         target_phase_key = day_phase(target_dt.hour)
         target_phase = phase_label(target_phase_key, self.language_var.get())
+        if source_zone_id:
+            source_dst_to_summer, source_dst_to_winter = next_dst_transition_summary(source_zone_id, source_dt, self.language_var.get())
+            source_dst_line = self._t(
+                f"źródło ({source_zone_id}): zima->lato {source_dst_to_summer} | lato->zima {source_dst_to_winter}",
+                f"source ({source_zone_id}): winter->summer {source_dst_to_summer} | summer->winter {source_dst_to_winter}",
+            )
+        else:
+            source_dst_line = self._t(
+                f"źródło ({source_zone_label}): stały offset, brak DST",
+                f"source ({source_zone_label}): fixed offset, no DST",
+            )
+
+        if target_zone_id:
+            target_dst_to_summer, target_dst_to_winter = next_dst_transition_summary(target_zone_id, target_dt, self.language_var.get())
+            target_dst_line = self._t(
+                f"cel ({target_zone_id}): zima->lato {target_dst_to_summer} | lato->zima {target_dst_to_winter}",
+                f"target ({target_zone_id}): winter->summer {target_dst_to_summer} | summer->winter {target_dst_to_winter}",
+            )
+        else:
+            target_dst_line = self._t(
+                f"cel ({target_label}): stały offset, brak DST",
+                f"target ({target_label}): fixed offset, no DST",
+            )
+
         self.converter_result_var.set(f"{target_dt:%Y-%m-%d %H:%M:%S}")
         detail = (
             f"{source_dt:%Y-%m-%d %H:%M:%S} ({source_zone_label}, {source_dt.tzname()}) -> "
@@ -5282,7 +5563,10 @@ class TimeSpecialistApp(tk.Tk):
                 f"Offsety: {format_offset(source_dt.utcoffset())} -> {format_offset(target_dt.utcoffset())} | różnica: {format_diff(diff)}\n",
                 f"Offsets: {format_offset(source_dt.utcoffset())} -> {format_offset(target_dt.utcoffset())} | difference: {format_diff(diff)}\n",
             )
-            + self._t(f"Pora dnia docelowo: {target_phase}", f"Target day phase: {target_phase}")
+            + self._t(f"Pora dnia docelowo: {target_phase}\n", f"Target day phase: {target_phase}\n")
+            + self._t("Najbliższe zmiany DST:\n", "Upcoming DST switches:\n")
+            + f"- {source_dst_line}\n"
+            + f"- {target_dst_line}"
         )
         if source_context:
             detail += f"\n{source_context}"
