@@ -1957,6 +1957,7 @@ class TimeSpecialistApp(tk.Tk):
         self.alarm_month_var = tk.StringVar(value="")
         self.alarm_year_var = tk.StringVar(value="")
         self.alarm_enabled_var = tk.BooleanVar(value=True)
+        self.alarm_loop_var = tk.BooleanVar(value=False)
         self.alarms_paused_var = tk.BooleanVar(value=bool(self._loaded_settings.get("alarms_paused", False)))
         self.alarm_duration_var = tk.StringVar(value="20")
         self.alarm_sound_display_var = tk.StringVar(value="")
@@ -3819,6 +3820,9 @@ class TimeSpecialistApp(tk.Tk):
         self._bind_i18n(alarm_duration_label, "text", "Długość dzwonienia (s):", "Ring duration (s):")
         self.alarm_duration_entry = ttk.Entry(form, textvariable=self.alarm_duration_var, style="Search.TEntry")
         self.alarm_duration_entry.grid(row=2, column=3, sticky="ew", padx=(6, 0), pady=(10, 0))
+        self.alarm_loop_check = ttk.Checkbutton(form, text="", variable=self.alarm_loop_var)
+        self.alarm_loop_check.grid(row=2, column=1, sticky="w", padx=(6, 0), pady=(10, 0))
+        self._bind_i18n(self.alarm_loop_check, "text", "Loop (pętla do długości alarmu)", "Loop (repeat until alarm duration ends)")
 
         alarm_sound_label = ttk.Label(form, text="", style="SmallInfo.TLabel")
         alarm_sound_label.grid(row=3, column=0, sticky="w", pady=(10, 0))
@@ -3836,19 +3840,25 @@ class TimeSpecialistApp(tk.Tk):
         alarm_sound_file_label = ttk.Label(form, text="", style="SmallInfo.TLabel")
         alarm_sound_file_label.grid(row=4, column=0, sticky="w", pady=(10, 0))
         self._bind_i18n(alarm_sound_file_label, "text", "Własny plik audio (opcjonalnie):", "Custom audio file (optional):")
-        self.alarm_sound_file_entry = ttk.Entry(form, textvariable=self.alarm_sound_file_var, style="Search.TEntry")
-        self.alarm_sound_file_entry.grid(row=4, column=1, columnspan=2, sticky="ew", padx=(6, 8), pady=(10, 0))
-        self.alarm_sound_file_btn = ttk.Button(form, text="", style="Action.TButton", command=self._browse_alarm_sound_file)
-        self.alarm_sound_file_btn.grid(row=4, column=3, sticky="e", pady=(10, 0))
+        self.alarm_sound_file_field = ttk.Frame(form, style="Card.TFrame")
+        self.alarm_sound_file_field.grid(row=4, column=1, columnspan=3, sticky="ew", padx=(6, 0), pady=(10, 0))
+        self.alarm_sound_file_field.columnconfigure(0, weight=1)
+        self.alarm_sound_file_entry = ttk.Entry(self.alarm_sound_file_field, textvariable=self.alarm_sound_file_var, style="Search.TEntry")
+        self.alarm_sound_file_entry.grid(row=0, column=0, sticky="ew", padx=(0, 4))
+        self.alarm_sound_file_btn = ttk.Button(self.alarm_sound_file_field, text="", style="Action.TButton", command=self._browse_alarm_sound_file)
+        self.alarm_sound_file_btn.grid(row=0, column=1, sticky="e")
         self._bind_i18n(self.alarm_sound_file_btn, "text", "🎵 Wybierz", "🎵 Browse")
 
         alarm_script_label = ttk.Label(form, text="", style="SmallInfo.TLabel")
         alarm_script_label.grid(row=5, column=0, sticky="w", pady=(10, 0))
         self._bind_i18n(alarm_script_label, "text", "Skrypt (opcjonalnie):", "Script (optional):")
-        self.alarm_script_entry = ttk.Entry(form, textvariable=self.alarm_script_var, style="Search.TEntry")
-        self.alarm_script_entry.grid(row=5, column=1, columnspan=2, sticky="ew", padx=(6, 8), pady=(10, 0))
-        self.alarm_script_browse_btn = ttk.Button(form, text="", style="Action.TButton", command=self._browse_alarm_script)
-        self.alarm_script_browse_btn.grid(row=5, column=3, sticky="e", pady=(10, 0))
+        self.alarm_script_field = ttk.Frame(form, style="Card.TFrame")
+        self.alarm_script_field.grid(row=5, column=1, columnspan=3, sticky="ew", padx=(6, 0), pady=(10, 0))
+        self.alarm_script_field.columnconfigure(0, weight=1)
+        self.alarm_script_entry = ttk.Entry(self.alarm_script_field, textvariable=self.alarm_script_var, style="Search.TEntry")
+        self.alarm_script_entry.grid(row=0, column=0, sticky="ew", padx=(0, 4))
+        self.alarm_script_browse_btn = ttk.Button(self.alarm_script_field, text="", style="Action.TButton", command=self._browse_alarm_script)
+        self.alarm_script_browse_btn.grid(row=0, column=1, sticky="e")
         self._bind_i18n(self.alarm_script_browse_btn, "text", "📂 Wybierz", "📂 Browse")
 
         self.alarms_pause_check = ttk.Checkbutton(form, text="", variable=self.alarms_paused_var, command=self._on_alarms_pause_toggle)
@@ -3887,13 +3897,15 @@ class TimeSpecialistApp(tk.Tk):
             "Kolumna Rodzaj pokazuje ∞ dla alarmu bez daty, Jednorazowy dla alarmu z datą "
             "oraz dopisek / Skrypt, gdy uruchamiany jest dodatkowy skrypt. "
             "Pauza alarmów i timerów wstrzymuje całą sekcję bez zmiany statusów. "
-            "Własny plik audio (np. MP3) działa też na pętli do ustawionej długości alarmu. "
+            "Checkbox Loop steruje zapętlaniem dźwięku do ustawionej długości alarmu. "
+            "Własny plik audio (np. MP3) może grać raz albo w pętli (Loop). "
             "Skrypt uruchamia się wraz z dźwiękiem.",
             "Field help: label = alarm name, zone = where it should ring, date optional (day/month/year), "
             "the Kind column shows ∞ for alarms without a date, One-off for alarms with a date, "
             "and adds / Script when an extra script is attached. "
             "Pause alarms & timers stops the whole section without changing statuses. "
-            "A custom audio file (e.g., MP3) also loops until the configured alarm duration ends. "
+            "Loop checkbox controls whether alarm audio repeats until the configured duration. "
+            "A custom audio file (for example MP3) can play once or loop (Loop). "
             "Script runs together with the sound.",
         )
         self._set_alarm_pause_status_text(mark_dirty=False)
@@ -4146,6 +4158,7 @@ class TimeSpecialistApp(tk.Tk):
             self.alarm_month_var.set("")
             self.alarm_year_var.set("")
         self.alarm_enabled_var.set(bool(alarm.get("enabled", True)))
+        self.alarm_loop_var.set(bool(alarm.get("loop_sound", False)))
         self.alarm_duration_var.set(str(alarm.get("duration", "20")))
         self.alarm_sound_file_var.set(str(alarm.get("sound_file", "")))
         self.alarm_script_var.set(str(alarm.get("script", "")))
@@ -4190,6 +4203,7 @@ class TimeSpecialistApp(tk.Tk):
                 return
             sound_file = str(sound_path)
         repeat_daily = not bool(date_raw)
+        loop_sound = bool(self.alarm_loop_var.get())
         script_path = self.alarm_script_var.get().strip()
         sound_id = self._resolve_alarm_sound_id()
         alarm_id = self.next_alarm_id
@@ -4203,6 +4217,7 @@ class TimeSpecialistApp(tk.Tk):
                 "date": date_raw,
                 "enabled": bool(self.alarm_enabled_var.get()),
                 "repeat_daily": repeat_daily,
+                "loop_sound": loop_sound,
                 "duration": duration,
                 "sound_id": sound_id,
                 "sound_file": sound_file,
@@ -4256,6 +4271,7 @@ class TimeSpecialistApp(tk.Tk):
                 return
             sound_file = str(sound_path)
         repeat_daily = not bool(date_raw)
+        loop_sound = bool(self.alarm_loop_var.get())
         script_path = self.alarm_script_var.get().strip()
         sound_id = self._resolve_alarm_sound_id()
         alarm.update(
@@ -4266,6 +4282,7 @@ class TimeSpecialistApp(tk.Tk):
                 "date": date_raw,
                 "enabled": bool(self.alarm_enabled_var.get()),
                 "repeat_daily": repeat_daily,
+                "loop_sound": loop_sound,
                 "duration": duration,
                 "sound_id": sound_id,
                 "sound_file": sound_file,
@@ -4312,6 +4329,7 @@ class TimeSpecialistApp(tk.Tk):
         self.alarm_year_var.set("")
         self.alarm_enabled_var.set(True)
         self.alarm_duration_var.set("20")
+        self.alarm_loop_var.set(False)
         self.alarm_sound_id_var.set(DEFAULT_ALARM_SOUND_ID)
         self.alarm_sound_file_var.set("")
         self.alarm_script_var.set("")
@@ -4320,7 +4338,7 @@ class TimeSpecialistApp(tk.Tk):
     def _test_alarm_sound(self) -> None:
         sound_id = self._resolve_alarm_sound_id()
         path = self._alarm_sound_path(sound_id, self.alarm_sound_file_var.get().strip())
-        self._play_sound_for_duration(path, 4)
+        self._play_sound_for_duration(path, 4, loop_sound=bool(self.alarm_loop_var.get()))
         self.alarm_status_var.set(self._t("Odtworzono dźwięk alarmu.", "Played alarm sound."))
 
     def _start_stopwatch(self) -> None:
@@ -4462,10 +4480,11 @@ class TimeSpecialistApp(tk.Tk):
                     continue
                 self.alarm_last_fire[alarm_id] = key
                 duration = int(alarm.get("duration", 20) or 20)
+                loop_sound = bool(alarm.get("loop_sound", False))
                 sound_id = str(alarm.get("sound_id", DEFAULT_ALARM_SOUND_ID))
                 sound_file = str(alarm.get("sound_file", "")).strip()
                 path = self._alarm_sound_path(sound_id, sound_file)
-                self._play_sound_for_duration(path, duration)
+                self._play_sound_for_duration(path, duration, loop_sound=loop_sound)
                 script_path = str(alarm.get("script", "")).strip()
                 if script_path:
                     self._run_alarm_script(script_path)
@@ -4517,6 +4536,26 @@ class TimeSpecialistApp(tk.Tk):
         except Exception:
             return False
 
+    def _mci_open_with_alias(self, path: Path, alias: str) -> bool:
+        escaped = str(path).replace('"', '""')
+        suffix = path.suffix.lower()
+        open_commands: list[str] = []
+        if suffix in (".mp3", ".mp2", ".mpeg", ".mpg", ".aac", ".m4a", ".wma"):
+            open_commands.extend(
+                [
+                    f'open "{escaped}" type mpegvideo alias {alias}',
+                    f'open "{escaped}" type MPEGVideo alias {alias}',
+                ]
+            )
+        elif suffix == ".wav":
+            open_commands.append(f'open "{escaped}" type waveaudio alias {alias}')
+        open_commands.append(f'open "{escaped}" alias {alias}')
+
+        for cmd in open_commands:
+            if self._mci_send(cmd):
+                return True
+        return False
+
     def _close_mci_audio(self) -> None:
         alias = self.current_mci_alias
         if not alias:
@@ -4542,11 +4581,11 @@ class TimeSpecialistApp(tk.Tk):
 
         self._close_mci_audio()
         alias = f"wtsaudio_{self.sound_playback_token}"
-        escaped = str(path).replace('"', '""')
-        if not self._mci_send(f'open "{escaped}" alias {alias}'):
+        if not self._mci_open_with_alias(path, alias):
             return False
         self.current_mci_alias = alias
-        play_cmd = f"play {alias} repeat" if loop else f"play {alias}"
+        self._mci_send(f"seek {alias} to start")
+        play_cmd = f"play {alias} repeat" if loop else f"play {alias} from 0"
         if not self._mci_send(play_cmd):
             self._close_mci_audio()
             return False
@@ -4566,7 +4605,7 @@ class TimeSpecialistApp(tk.Tk):
         if self.tile_ticking_var.get() and self.any_session_active:
             self.after(1200, self._schedule_ticking)
 
-    def _play_sound_for_duration(self, path: Path | None, duration_seconds: int) -> None:
+    def _play_sound_for_duration(self, path: Path | None, duration_seconds: int, loop_sound: bool = False) -> None:
         if self.sound_muted:
             return
         duration_seconds = max(1, int(duration_seconds))
@@ -4575,7 +4614,7 @@ class TimeSpecialistApp(tk.Tk):
         self._cancel_pending_sound_stop()
         self._stop_ticking()
         try:
-            if not self._play_audio_backend(path, loop=True):
+            if not self._play_audio_backend(path, loop=bool(loop_sound)):
                 winsound.MessageBeep(winsound.MB_ICONASTERISK)
         except RuntimeError:
             return
@@ -4747,6 +4786,10 @@ class TimeSpecialistApp(tk.Tk):
 
     def _update_ticking_state(self, any_active: bool) -> None:
         self.any_session_active = any_active
+        # Keep ticking suspended while a timed sound (alarm/timer) is playing.
+        if self.sound_stop_after_id is not None:
+            self._stop_ticking(stop_sound=True)
+            return
         if not self.tile_ticking_var.get() or self.sound_muted or not SOUND_TICKING.is_file():
             self._stop_ticking(stop_sound=True)
             return
@@ -4767,7 +4810,7 @@ class TimeSpecialistApp(tk.Tk):
         if generation != self.ticking_generation:
             return
         self.ticking_after_id = None
-        if not self.tile_ticking_var.get() or self.sound_muted or not self.any_session_active:
+        if not self.tile_ticking_var.get() or self.sound_muted or not self.any_session_active or self.sound_stop_after_id is not None:
             return
         try:
             winsound.PlaySound(None, winsound.SND_PURGE)
@@ -4864,6 +4907,7 @@ class TimeSpecialistApp(tk.Tk):
                 duration = max(1, int(duration_raw))
             except (TypeError, ValueError):
                 duration = 20
+            loop_sound = bool(row.get("loop_sound", False))
             sound_id = str(row.get("sound_id", DEFAULT_ALARM_SOUND_ID)).strip() or DEFAULT_ALARM_SOUND_ID
             if not any(sound.get("id") == sound_id for sound in ALARM_SOUND_LIBRARY):
                 sound_id = DEFAULT_ALARM_SOUND_ID
@@ -4890,6 +4934,7 @@ class TimeSpecialistApp(tk.Tk):
                     "date": date_raw,
                     "enabled": enabled,
                     "repeat_daily": repeat_daily,
+                    "loop_sound": loop_sound,
                     "duration": duration,
                     "sound_id": sound_id,
                     "sound_file": sound_file,
@@ -5032,6 +5077,7 @@ class TimeSpecialistApp(tk.Tk):
             self.tile_ticking_var,
             self.alarm_sound_id_var,
             self.alarm_sound_file_var,
+            self.alarm_loop_var,
             self.alarms_paused_var,
             self.minimize_on_start_var,
             self.fullscreen_auto_layout_var,
