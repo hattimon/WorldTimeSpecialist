@@ -1965,6 +1965,8 @@ class TimeSpecialistApp(tk.Tk):
         self.alarm_sound_file_var = tk.StringVar(value="")
         self.alarm_script_var = tk.StringVar(value="")
         self.alarm_status_var = tk.StringVar(value="")
+        self.alarm_pause_inline_var = tk.StringVar(value="")
+        self.alarm_editor_expanded_var = tk.BooleanVar(value=bool(self._loaded_settings.get("alarm_editor_expanded", False)))
 
         self.stopwatch_running = False
         self.stopwatch_start: datetime | None = None
@@ -1987,8 +1989,14 @@ class TimeSpecialistApp(tk.Tk):
         self.settings_dirty = False
         self.settings_save_after_id: str | None = None
         self._i18n_widgets: list[tuple[tk.Widget, str, str, str]] = []
+        self.ui_scale = 1.0
+        self._scale_after_id: str | None = None
+        self.base_window_width = 1920
+        self.base_window_height = 1080
 
         self._load_alarms_from_settings()
+        if "alarm_editor_expanded" not in self._loaded_settings and not self.alarms:
+            self.alarm_editor_expanded_var.set(True)
 
         self._setup_styles()
         self._build_ui()
@@ -2002,6 +2010,7 @@ class TimeSpecialistApp(tk.Tk):
         self._wire_setting_traces()
 
         self.bind("<Escape>", self._on_escape)
+        self.bind("<Configure>", self._schedule_window_scale, add="+")
         self.protocol("WM_DELETE_WINDOW", self._on_app_close)
 
         self._refresh_loop()
@@ -2010,12 +2019,12 @@ class TimeSpecialistApp(tk.Tk):
     def _setup_styles(self) -> None:
         self.style = ttk.Style(self)
         self.style.theme_use("clam")
-        self.style.configure("Action.TButton", font=("Bahnschrift", 11, "bold"), padding=(12, 8))
-        self.style.configure("Search.TEntry", padding=(10, 7))
-        self.style.configure("TNotebook.Tab", font=("Bahnschrift", 12, "bold"), padding=(18, 12))
-        self.style.configure("Treeview", rowheight=34, borderwidth=0, font=("Bahnschrift", 11))
-        self.style.configure("Treeview.Heading", font=("Bahnschrift", 11, "bold"), relief="flat")
-        self.style.configure("AlarmStatus.TLabel", font=("Bahnschrift", 11, "bold"), foreground="#FF5A5A")
+        self.style.configure("Action.TButton", font=("Bahnschrift", self._scaled(11, 9), "bold"), padding=self._scaled_pair(12, 8, 8, 6))
+        self.style.configure("Search.TEntry", padding=self._scaled_pair(10, 7, 6, 5))
+        self.style.configure("TNotebook.Tab", font=("Bahnschrift", self._scaled(12, 9), "bold"), padding=self._scaled_pair(18, 12, 10, 8))
+        self.style.configure("Treeview", rowheight=self._scaled(34, 24), borderwidth=0, font=("Bahnschrift", self._scaled(11, 9)))
+        self.style.configure("Treeview.Heading", font=("Bahnschrift", self._scaled(11, 9), "bold"), relief="flat")
+        self.style.configure("AlarmStatus.TLabel", font=("Bahnschrift", self._scaled(11, 9), "bold"), foreground="#FF5A5A")
 
     def _t(self, pl: str, en: str) -> str:
         return en if self.language_var.get() == "en" else pl
@@ -2026,6 +2035,40 @@ class TimeSpecialistApp(tk.Tk):
             widget.configure(**{option: self._t(pl, en)})
         except tk.TclError:
             pass
+
+    def _scaled(self, value: int | float, minimum: int | None = None) -> int:
+        scaled = int(round(float(value) * self.ui_scale))
+        if minimum is not None:
+            return max(minimum, scaled)
+        return max(1, scaled)
+
+    def _scaled_pair(self, x_value: int | float, y_value: int | float, min_x: int = 1, min_y: int = 1) -> tuple[int, int]:
+        return (self._scaled(x_value, min_x), self._scaled(y_value, min_y))
+
+    def _schedule_window_scale(self, event: tk.Event | None = None) -> None:
+        if event is not None and event.widget is not self:
+            return
+        if self._scale_after_id is not None:
+            try:
+                self.after_cancel(self._scale_after_id)
+            except tk.TclError:
+                pass
+        self._scale_after_id = self.after(90, self._apply_window_scale)
+
+    def _apply_window_scale(self) -> None:
+        self._scale_after_id = None
+        width = max(1, self.winfo_width())
+        height = max(1, self.winfo_height())
+        ratio = min(width / self.base_window_width, height / self.base_window_height)
+        new_scale = min(1.12, max(0.58, ratio))
+        if abs(new_scale - self.ui_scale) < 0.03:
+            return
+        self.ui_scale = new_scale
+        try:
+            self.tk.call("tk", "scaling", max(1.0, 1.333 * self.ui_scale))
+        except tk.TclError:
+            pass
+        self._apply_theme(force=True)
 
     def _build_city_zone_values(self, zone_ids: list[str]) -> tuple[list[str], dict[str, str]]:
         values: list[str] = []
@@ -2112,8 +2155,10 @@ class TimeSpecialistApp(tk.Tk):
             self.notebook.tab(self.tiles_tab, text=I18N["tab_tiles"][self.language_var.get()])
             if hasattr(self, "alarms_tab"):
                 self.notebook.tab(self.alarms_tab, text=I18N["tab_alarms"][self.language_var.get()])
-            if hasattr(self, "links_tab"):
-                self.notebook.tab(self.links_tab, text=I18N["tab_links"][self.language_var.get()])
+        if hasattr(self, "links_tab"):
+            self.notebook.tab(self.links_tab, text=I18N["tab_links"][self.language_var.get()])
+        self._sync_alarm_editor_toggle_text()
+        self._set_alarm_pause_status_text(mark_dirty=False)
 
         self._update_tray_menu()
         self._refresh_tray_support_buttons()
@@ -2284,6 +2329,7 @@ class TimeSpecialistApp(tk.Tk):
         tree_head_bg = str(palette.get("tree_head_bg", card_bg))
         canvas_top = str(palette.get("canvas_top", card_bg))
         canvas_bottom = str(palette.get("canvas_bottom", app_bg))
+        compact_ui = self.ui_scale <= 0.70
 
         self.configure(bg=app_bg)
 
@@ -2291,16 +2337,20 @@ class TimeSpecialistApp(tk.Tk):
         self.style.configure("Root.TFrame", background=app_bg)
         self.style.configure("Card.TFrame", background=card_bg)
         self.style.configure("Card.TFrame", borderwidth=1, relief="solid")
-        self.style.configure("Header.TLabel", background=app_bg, foreground=heading, font=("Bahnschrift", 34, "bold"))
-        self.style.configure("SubHeader.TLabel", background=app_bg, foreground=muted, font=("Bahnschrift", 14))
-        self.style.configure("CardTitle.TLabel", background=card_bg, foreground=heading, font=("Bahnschrift", 18, "bold"))
-        self.style.configure("Clock.TLabel", background=card_bg, foreground=heading, font=("Consolas", 36, "bold"))
-        self.style.configure("Info.TLabel", background=card_bg, foreground=muted, font=("Bahnschrift", 13))
-        self.style.configure("SmallInfo.TLabel", background=card_bg, foreground=muted, font=("Bahnschrift", 12))
-        self.style.configure("EduTitle.TLabel", background=card_bg, foreground=heading, font=("Bahnschrift", 22, "bold"))
-        self.style.configure("EduMain.TLabel", background=card_bg, foreground=text, font=("Bahnschrift", 14))
-        self.style.configure("EduMore.TLabel", background=card_bg, foreground=muted, font=("Bahnschrift", 13))
-        self.style.configure("Action.TButton", font=("Bahnschrift", 12, "bold"), padding=(12, 8))
+        self.style.configure("Header.TLabel", background=app_bg, foreground=heading, font=("Bahnschrift", self._scaled(34, 22), "bold"))
+        self.style.configure("SubHeader.TLabel", background=app_bg, foreground=muted, font=("Bahnschrift", self._scaled(14, 10)))
+        self.style.configure("CardTitle.TLabel", background=card_bg, foreground=heading, font=("Bahnschrift", self._scaled(17 if compact_ui else 18, 11), "bold"))
+        self.style.configure("Clock.TLabel", background=card_bg, foreground=heading, font=("Consolas", self._scaled(30 if compact_ui else 36, 18), "bold"))
+        self.style.configure("Info.TLabel", background=card_bg, foreground=muted, font=("Bahnschrift", self._scaled(13, 10)))
+        self.style.configure("SmallInfo.TLabel", background=card_bg, foreground=muted, font=("Bahnschrift", self._scaled(12, 9)))
+        self.style.configure("EduTitle.TLabel", background=card_bg, foreground=heading, font=("Bahnschrift", self._scaled(22, 14), "bold"))
+        self.style.configure("EduMain.TLabel", background=card_bg, foreground=text, font=("Bahnschrift", self._scaled(14, 10)))
+        self.style.configure("EduMore.TLabel", background=card_bg, foreground=muted, font=("Bahnschrift", self._scaled(13, 10)))
+        self.style.configure(
+            "Action.TButton",
+            font=("Bahnschrift", self._scaled(11 if compact_ui else 12, 8), "bold"),
+            padding=self._scaled_pair(8 if compact_ui else 12, 5 if compact_ui else 8, 5, 4),
+        )
         self.style.map(
             "Action.TButton",
             background=[("active", accent_hover), ("!active", accent)],
@@ -2308,18 +2358,80 @@ class TimeSpecialistApp(tk.Tk):
         )
 
         self.style.configure("TNotebook", background=app_bg, borderwidth=0)
-        self.style.configure("TNotebook.Tab", font=("Bahnschrift", 12, "bold"), padding=(18, 12))
+        self.style.configure(
+            "TNotebook.Tab",
+            font=("Bahnschrift", self._scaled(11 if compact_ui else 12, 8), "bold"),
+            padding=self._scaled_pair(12 if compact_ui else 18, 8 if compact_ui else 12, 8, 6),
+        )
         self.style.map(
             "TNotebook.Tab",
             background=[("selected", card_bg), ("!selected", card_alt_bg)],
             foreground=[("selected", heading), ("!selected", muted)],
         )
-        self.style.configure("Treeview", background=tree_bg, fieldbackground=tree_bg, foreground=text, rowheight=34, borderwidth=0, font=("Bahnschrift", 11))
-        self.style.configure("Treeview.Heading", background=tree_head_bg, foreground=heading, font=("Bahnschrift", 11, "bold"), relief="flat")
+        self.style.configure("Treeview", background=tree_bg, fieldbackground=tree_bg, foreground=text, rowheight=self._scaled(28 if compact_ui else 34, 20), borderwidth=0, font=("Bahnschrift", self._scaled(10 if compact_ui else 11, 8)))
+        self.style.configure("Treeview.Heading", background=tree_head_bg, foreground=heading, font=("Bahnschrift", self._scaled(10 if compact_ui else 11, 8), "bold"), relief="flat")
         self.style.map("Treeview", background=[("selected", accent_soft)], foreground=[("selected", heading)])
         self._configure_alarm_tree_tags()
-        self.style.configure("Search.TEntry", padding=(8, 6), fieldbackground=entry_bg, foreground=entry_text)
-        self.style.configure("TScrollbar", gripcount=0, background=blend_hex(accent, app_bg, 0.35), troughcolor=canvas_bottom)
+        self.style.configure(
+            "Search.TEntry",
+            padding=self._scaled_pair(6 if compact_ui else 8, 4 if compact_ui else 6, 4, 3),
+            fieldbackground=entry_bg,
+            foreground=entry_text,
+        )
+        scrollbar_bg = blend_hex(accent, app_bg, 0.35)
+        scrollbar_active = blend_hex(accent_hover, "#FFFFFF", 0.08)
+        self.style.configure(
+            "TScrollbar",
+            gripcount=0,
+            background=scrollbar_bg,
+            troughcolor=canvas_bottom,
+            bordercolor=card_bg,
+            darkcolor=scrollbar_bg,
+            lightcolor=scrollbar_bg,
+            arrowcolor=heading,
+            arrowsize=self._scaled(14, 10),
+            width=self._scaled(14, 10),
+            relief="flat",
+        )
+        self.style.configure(
+            "Vertical.TScrollbar",
+            background=scrollbar_bg,
+            troughcolor=canvas_bottom,
+            bordercolor=card_bg,
+            darkcolor=scrollbar_bg,
+            lightcolor=scrollbar_bg,
+            arrowcolor=heading,
+            arrowsize=self._scaled(14, 10),
+            width=self._scaled(14, 10),
+            relief="flat",
+        )
+        self.style.configure(
+            "Horizontal.TScrollbar",
+            background=scrollbar_bg,
+            troughcolor=canvas_bottom,
+            bordercolor=card_bg,
+            darkcolor=scrollbar_bg,
+            lightcolor=scrollbar_bg,
+            arrowcolor=heading,
+            arrowsize=self._scaled(14, 10),
+            width=self._scaled(14, 10),
+            relief="flat",
+        )
+        self.style.map(
+            "TScrollbar",
+            background=[("active", scrollbar_active), ("!active", scrollbar_bg)],
+            arrowcolor=[("disabled", muted), ("!disabled", heading)],
+        )
+        self.style.map(
+            "Vertical.TScrollbar",
+            background=[("active", scrollbar_active), ("!active", scrollbar_bg)],
+            arrowcolor=[("disabled", muted), ("!disabled", heading)],
+        )
+        self.style.map(
+            "Horizontal.TScrollbar",
+            background=[("active", scrollbar_active), ("!active", scrollbar_bg)],
+            arrowcolor=[("disabled", muted), ("!disabled", heading)],
+        )
         glass_a = blend_hex(card_bg, "#FFFFFF", 0.10)
         glass_b = blend_hex(card_bg, app_bg, 0.35)
         self.style.configure(
@@ -2330,8 +2442,8 @@ class TimeSpecialistApp(tk.Tk):
             bordercolor=blend_hex(heading, app_bg, 0.70),
             darkcolor=glass_b,
             lightcolor=glass_b,
-            arrowsize=16,
-            padding=6,
+            arrowsize=self._scaled(16, 12),
+            padding=self._scaled(6, 4),
         )
         self.style.map(
             "Glass.TCombobox",
@@ -2362,6 +2474,17 @@ class TimeSpecialistApp(tk.Tk):
 
         if hasattr(self, "education_map_canvas"):
             self._draw_education_map()
+
+        if hasattr(self, "alarms_tab"):
+            try:
+                alarms_parent = self.alarms_tree.nametowidget(self.alarms_tree.winfo_parent()) if hasattr(self, "alarms_tree") else None
+                if alarms_parent is not None:
+                    alarms_parent.rowconfigure(1, minsize=self._scaled(260, 180))
+            except tk.TclError:
+                pass
+
+        if hasattr(self, "alarms_tree"):
+            self.alarms_tree.configure(height=max(6, self._scaled(9, 6)))
 
         if hasattr(self, "tiles_canvas"):
             self.tiles_canvas.configure(bg=canvas_bottom)
@@ -3717,6 +3840,7 @@ class TimeSpecialistApp(tk.Tk):
         root.columnconfigure(0, weight=3)
         root.columnconfigure(1, weight=2)
         root.rowconfigure(1, weight=1)
+        self.alarms_root = root
 
         header = ttk.Frame(root, style="Card.TFrame", padding=12)
         header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
@@ -3735,15 +3859,17 @@ class TimeSpecialistApp(tk.Tk):
 
         alarms_card = ttk.Frame(root, style="Card.TFrame", padding=12)
         alarms_card.grid(row=1, column=0, sticky="nsew", padx=(0, 8))
+        self.alarms_left_card = alarms_card
         alarms_card.columnconfigure(0, weight=1)
-        alarms_card.rowconfigure(1, weight=1)
+        alarms_card.columnconfigure(1, weight=0)
+        alarms_card.rowconfigure(1, weight=1, minsize=260)
 
         alarms_title = ttk.Label(alarms_card, text="", style="CardTitle.TLabel")
         alarms_title.grid(row=0, column=0, sticky="w")
         self._bind_i18n(alarms_title, "text", "📌 Lista alarmów", "📌 Alarm list")
 
         columns = ("label", "zone", "time", "date", "repeat", "duration", "sound", "enabled")
-        self.alarms_tree = ttk.Treeview(alarms_card, columns=columns, show="headings", selectmode="browse")
+        self.alarms_tree = ttk.Treeview(alarms_card, columns=columns, show="headings", selectmode="browse", height=9)
         self.alarms_tree.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
         self.alarms_tree.heading("label", text=self._t("Nazwa", "Label"))
         self.alarms_tree.heading("zone", text=self._t("Strefa", "Zone"))
@@ -3768,19 +3894,45 @@ class TimeSpecialistApp(tk.Tk):
         alarm_scroll.grid(row=1, column=1, sticky="ns", pady=(8, 0))
         self.alarms_tree.configure(yscrollcommand=alarm_scroll.set)
 
-        form = ttk.Frame(alarms_card, style="Card.TFrame", padding=8)
-        form.grid(row=2, column=0, sticky="ew", pady=(10, 0))
-        for col in range(4):
+        controls_bar = ttk.Frame(alarms_card, style="Card.TFrame")
+        controls_bar.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+        controls_bar.columnconfigure(1, weight=1)
+        controls_bar.columnconfigure(2, weight=0)
+        self.alarms_pause_check = ttk.Checkbutton(controls_bar, text="", variable=self.alarms_paused_var, command=self._on_alarms_pause_toggle)
+        self.alarms_pause_check.grid(row=0, column=0, sticky="w")
+        self._bind_i18n(self.alarms_pause_check, "text", "Pauza alarmów i timerów", "Pause alarms & timers")
+        self.alarms_pause_inline_label = ttk.Label(controls_bar, textvariable=self.alarm_pause_inline_var, style="AlarmStatus.TLabel")
+        self.alarms_pause_inline_label.grid(row=0, column=1, sticky="w", padx=(12, 0))
+        self.alarm_editor_toggle_btn = ttk.Button(controls_bar, text="", width=3, style="Action.TButton", command=self._toggle_alarm_editor)
+        self.alarm_editor_toggle_btn.grid(row=0, column=2, sticky="e")
+
+        self.alarm_editor_card = ttk.Frame(alarms_card, style="Card.TFrame", padding=6)
+        self.alarm_editor_card.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+        self.alarm_editor_card.columnconfigure(0, weight=1)
+
+        form = ttk.Frame(self.alarm_editor_card, style="Card.TFrame")
+        form.grid(row=0, column=0, sticky="ew")
+        for col in (1, 3, 5):
             form.columnconfigure(col, weight=1)
 
         alarm_label = ttk.Label(form, text="", style="SmallInfo.TLabel")
         alarm_label.grid(row=0, column=0, sticky="w")
         self._bind_i18n(alarm_label, "text", "Nazwa alarmu:", "Alarm label:")
         self.alarm_label_entry = ttk.Entry(form, textvariable=self.alarm_label_var, style="Search.TEntry")
-        self.alarm_label_entry.grid(row=0, column=1, sticky="ew", padx=(6, 12))
+        self.alarm_label_entry.grid(row=0, column=1, sticky="ew", padx=(6, 10))
+
+        alarm_time_label = ttk.Label(form, text="", style="SmallInfo.TLabel")
+        alarm_time_label.grid(row=0, column=2, sticky="w")
+        self._bind_i18n(alarm_time_label, "text", "Godzina (HH:MM):", "Time (HH:MM):")
+        self.alarm_time_entry = ttk.Entry(form, textvariable=self.alarm_time_var, style="Search.TEntry")
+        self.alarm_time_entry.grid(row=0, column=3, sticky="ew", padx=(6, 10))
+
+        self.alarm_loop_check = ttk.Checkbutton(form, text="", variable=self.alarm_loop_var)
+        self.alarm_loop_check.grid(row=0, column=4, columnspan=2, sticky="w", padx=(6, 0))
+        self._bind_i18n(self.alarm_loop_check, "text", "Loop (pętla do długości alarmu)", "Loop (repeat until alarm duration ends)")
 
         alarm_zone = ttk.Label(form, text="", style="SmallInfo.TLabel")
-        alarm_zone.grid(row=0, column=2, sticky="w")
+        alarm_zone.grid(row=1, column=0, sticky="w", pady=(6, 0))
         self._bind_i18n(alarm_zone, "text", "Strefa czasowa:", "Time zone:")
         self.alarm_zone_entry = ttk.Combobox(
             form,
@@ -3789,20 +3941,20 @@ class TimeSpecialistApp(tk.Tk):
             style="Glass.TCombobox",
             state="normal",
         )
-        self.alarm_zone_entry.grid(row=0, column=3, sticky="ew", padx=(6, 0))
+        self.alarm_zone_entry.grid(row=1, column=1, columnspan=3, sticky="ew", padx=(6, 10), pady=(6, 0))
         self._register_autocomplete(self.alarm_zone_entry, self.iana_zone_values)
 
-        alarm_time_label = ttk.Label(form, text="", style="SmallInfo.TLabel")
-        alarm_time_label.grid(row=1, column=0, sticky="w", pady=(10, 0))
-        self._bind_i18n(alarm_time_label, "text", "Godzina (HH:MM):", "Time (HH:MM):")
-        self.alarm_time_entry = ttk.Entry(form, textvariable=self.alarm_time_var, style="Search.TEntry")
-        self.alarm_time_entry.grid(row=1, column=1, sticky="ew", padx=(6, 12), pady=(10, 0))
+        alarm_duration_label = ttk.Label(form, text="", style="SmallInfo.TLabel")
+        alarm_duration_label.grid(row=1, column=4, sticky="w", pady=(6, 0))
+        self._bind_i18n(alarm_duration_label, "text", "Długość (s):", "Duration (s):")
+        self.alarm_duration_entry = ttk.Entry(form, textvariable=self.alarm_duration_var, style="Search.TEntry")
+        self.alarm_duration_entry.grid(row=1, column=5, sticky="ew", padx=(6, 0), pady=(6, 0))
 
         alarm_date_label = ttk.Label(form, text="", style="SmallInfo.TLabel")
-        alarm_date_label.grid(row=1, column=2, sticky="w", pady=(10, 0))
+        alarm_date_label.grid(row=2, column=0, sticky="w", pady=(6, 0))
         self._bind_i18n(alarm_date_label, "text", "Data (opcjonalnie):", "Date (optional):")
         date_frame = ttk.Frame(form, style="Card.TFrame")
-        date_frame.grid(row=1, column=3, sticky="w", padx=(6, 0), pady=(10, 0))
+        date_frame.grid(row=2, column=1, sticky="w", padx=(6, 10), pady=(6, 0))
         date_frame.columnconfigure(0, weight=0)
         date_frame.columnconfigure(1, weight=0)
         date_frame.columnconfigure(2, weight=0)
@@ -3815,17 +3967,8 @@ class TimeSpecialistApp(tk.Tk):
         self.alarm_year_entry = ttk.Entry(date_frame, textvariable=self.alarm_year_var, width=6, style="Search.TEntry")
         self.alarm_year_entry.grid(row=0, column=2)
 
-        alarm_duration_label = ttk.Label(form, text="", style="SmallInfo.TLabel")
-        alarm_duration_label.grid(row=2, column=2, sticky="w", pady=(10, 0))
-        self._bind_i18n(alarm_duration_label, "text", "Długość dzwonienia (s):", "Ring duration (s):")
-        self.alarm_duration_entry = ttk.Entry(form, textvariable=self.alarm_duration_var, style="Search.TEntry")
-        self.alarm_duration_entry.grid(row=2, column=3, sticky="ew", padx=(6, 0), pady=(10, 0))
-        self.alarm_loop_check = ttk.Checkbutton(form, text="", variable=self.alarm_loop_var)
-        self.alarm_loop_check.grid(row=2, column=1, sticky="w", padx=(6, 0), pady=(10, 0))
-        self._bind_i18n(self.alarm_loop_check, "text", "Loop (pętla do długości alarmu)", "Loop (repeat until alarm duration ends)")
-
         alarm_sound_label = ttk.Label(form, text="", style="SmallInfo.TLabel")
-        alarm_sound_label.grid(row=3, column=0, sticky="w", pady=(10, 0))
+        alarm_sound_label.grid(row=2, column=2, sticky="w", pady=(6, 0))
         self._bind_i18n(alarm_sound_label, "text", "Dźwięk alarmu:", "Alarm sound:")
         self.alarm_sound_combo = ttk.Combobox(
             form,
@@ -3834,14 +3977,14 @@ class TimeSpecialistApp(tk.Tk):
             state="readonly",
             style="Glass.TCombobox",
         )
-        self.alarm_sound_combo.grid(row=3, column=1, columnspan=3, sticky="ew", padx=(6, 0), pady=(10, 0))
+        self.alarm_sound_combo.grid(row=2, column=3, columnspan=3, sticky="ew", padx=(6, 0), pady=(6, 0))
         self.alarm_sound_combo.bind("<<ComboboxSelected>>", self._on_alarm_sound_select)
 
         alarm_sound_file_label = ttk.Label(form, text="", style="SmallInfo.TLabel")
-        alarm_sound_file_label.grid(row=4, column=0, sticky="w", pady=(10, 0))
-        self._bind_i18n(alarm_sound_file_label, "text", "Własny plik audio (opcjonalnie):", "Custom audio file (optional):")
+        alarm_sound_file_label.grid(row=3, column=0, sticky="w", pady=(6, 0))
+        self._bind_i18n(alarm_sound_file_label, "text", "Plik audio:", "Audio file:")
         self.alarm_sound_file_field = ttk.Frame(form, style="Card.TFrame")
-        self.alarm_sound_file_field.grid(row=4, column=1, columnspan=3, sticky="ew", padx=(6, 0), pady=(10, 0))
+        self.alarm_sound_file_field.grid(row=3, column=1, columnspan=2, sticky="ew", padx=(6, 10), pady=(6, 0))
         self.alarm_sound_file_field.columnconfigure(0, weight=1)
         self.alarm_sound_file_entry = ttk.Entry(self.alarm_sound_file_field, textvariable=self.alarm_sound_file_var, style="Search.TEntry")
         self.alarm_sound_file_entry.grid(row=0, column=0, sticky="ew", padx=(0, 4))
@@ -3850,10 +3993,10 @@ class TimeSpecialistApp(tk.Tk):
         self._bind_i18n(self.alarm_sound_file_btn, "text", "🎵 Wybierz", "🎵 Browse")
 
         alarm_script_label = ttk.Label(form, text="", style="SmallInfo.TLabel")
-        alarm_script_label.grid(row=5, column=0, sticky="w", pady=(10, 0))
-        self._bind_i18n(alarm_script_label, "text", "Skrypt (opcjonalnie):", "Script (optional):")
+        alarm_script_label.grid(row=3, column=3, sticky="w", pady=(6, 0))
+        self._bind_i18n(alarm_script_label, "text", "Skrypt:", "Script:")
         self.alarm_script_field = ttk.Frame(form, style="Card.TFrame")
-        self.alarm_script_field.grid(row=5, column=1, columnspan=3, sticky="ew", padx=(6, 0), pady=(10, 0))
+        self.alarm_script_field.grid(row=3, column=4, columnspan=2, sticky="ew", padx=(6, 0), pady=(6, 0))
         self.alarm_script_field.columnconfigure(0, weight=1)
         self.alarm_script_entry = ttk.Entry(self.alarm_script_field, textvariable=self.alarm_script_var, style="Search.TEntry")
         self.alarm_script_entry.grid(row=0, column=0, sticky="ew", padx=(0, 4))
@@ -3861,12 +4004,8 @@ class TimeSpecialistApp(tk.Tk):
         self.alarm_script_browse_btn.grid(row=0, column=1, sticky="e")
         self._bind_i18n(self.alarm_script_browse_btn, "text", "📂 Wybierz", "📂 Browse")
 
-        self.alarms_pause_check = ttk.Checkbutton(form, text="", variable=self.alarms_paused_var, command=self._on_alarms_pause_toggle)
-        self.alarms_pause_check.grid(row=6, column=0, sticky="w", pady=(10, 0))
-        self._bind_i18n(self.alarms_pause_check, "text", "Pauza alarmów i timerów", "Pause alarms & timers")
-
         buttons = ttk.Frame(form, style="Card.TFrame")
-        buttons.grid(row=6, column=1, columnspan=3, sticky="e", pady=(10, 0))
+        buttons.grid(row=4, column=0, columnspan=6, sticky="e", pady=(6, 0))
         self.alarm_add_btn = ttk.Button(buttons, text="", style="Action.TButton", command=self._add_alarm)
         self.alarm_add_btn.grid(row=0, column=0, padx=(0, 6))
         self._bind_i18n(self.alarm_add_btn, "text", "➕ Dodaj", "➕ Add")
@@ -3887,31 +4026,21 @@ class TimeSpecialistApp(tk.Tk):
         self._bind_i18n(self.alarm_clear_btn, "text", "🧹 Wyczyść", "🧹 Clear")
 
         self.alarm_status_label = ttk.Label(alarms_card, textvariable=self.alarm_status_var, style="AlarmStatus.TLabel", wraplength=1100, justify="left")
-        self.alarm_status_label.grid(row=3, column=0, sticky="w", pady=(8, 0))
-        self.alarm_help_label = ttk.Label(alarms_card, text="", style="SmallInfo.TLabel", wraplength=1100, justify="left")
-        self.alarm_help_label.grid(row=4, column=0, sticky="w", pady=(6, 0))
+        self.alarm_status_label.grid(row=4, column=0, columnspan=2, sticky="w", pady=(6, 0))
+        self.alarm_help_label = ttk.Label(self.alarm_editor_card, text="", style="SmallInfo.TLabel", wraplength=1100, justify="left")
+        self.alarm_help_label.grid(row=1, column=0, sticky="w", pady=(4, 0))
         self._bind_i18n(
             self.alarm_help_label,
             "text",
-            "Opis pól: nazwa = etykieta alarmu, strefa = gdzie ma zadzwonić, data opcjonalna (dzień/miesiąc/rok). "
-            "Kolumna Rodzaj pokazuje ∞ dla alarmu bez daty, Jednorazowy dla alarmu z datą "
-            "oraz dopisek / Skrypt, gdy uruchamiany jest dodatkowy skrypt. "
-            "Pauza alarmów i timerów wstrzymuje całą sekcję bez zmiany statusów. "
-            "Checkbox Loop steruje zapętlaniem dźwięku do ustawionej długości alarmu. "
-            "Własny plik audio (np. MP3) może grać raz albo w pętli (Loop). "
-            "Skrypt uruchamia się wraz z dźwiękiem.",
-            "Field help: label = alarm name, zone = where it should ring, date optional (day/month/year), "
-            "the Kind column shows ∞ for alarms without a date, One-off for alarms with a date, "
-            "and adds / Script when an extra script is attached. "
-            "Pause alarms & timers stops the whole section without changing statuses. "
-            "Loop checkbox controls whether alarm audio repeats until the configured duration. "
-            "A custom audio file (for example MP3) can play once or loop (Loop). "
-            "Script runs together with the sound.",
+            "Bez daty = alarm codzienny, z datą = jednorazowy. Loop dotyczy tylko alarmu. Skrypt uruchamia się razem z alarmem.",
+            "No date = daily alarm, with date = one-off. Loop applies only to the real alarm. Script runs with the alarm.",
         )
         self._set_alarm_pause_status_text(mark_dirty=False)
+        self._update_alarm_editor_visibility(mark_dirty=False)
 
         right = ttk.Frame(root, style="Root.TFrame")
         right.grid(row=1, column=1, sticky="nsew", padx=(8, 0))
+        self.alarms_right_panel = right
         right.columnconfigure(0, weight=1)
         right.rowconfigure(0, weight=1)
         right.rowconfigure(1, weight=1)
@@ -3944,7 +4073,10 @@ class TimeSpecialistApp(tk.Tk):
         ttk.Label(timer_card, textvariable=self.timer_remaining_var, style="Clock.TLabel").grid(row=1, column=0, sticky="w", pady=(8, 0))
 
         timer_controls = ttk.Frame(timer_card, style="Card.TFrame")
-        timer_controls.grid(row=2, column=0, sticky="w", pady=(10, 0))
+        timer_controls.grid(row=2, column=0, sticky="ew", pady=(10, 0))
+        timer_controls.columnconfigure(1, weight=1)
+        timer_controls.columnconfigure(2, weight=1)
+        self.timer_controls = timer_controls
         timer_minutes_label = ttk.Label(timer_controls, text="", style="SmallInfo.TLabel")
         timer_minutes_label.grid(row=0, column=0, sticky="w")
         self._bind_i18n(timer_minutes_label, "text", "Minuty:", "Minutes:")
@@ -3994,6 +4126,8 @@ class TimeSpecialistApp(tk.Tk):
             "repeat every X minutes runs the script cyclically.",
         )
 
+        self.alarms_root.bind("<Configure>", self._refresh_alarms_tab_layout, add="+")
+        self.after(50, self._refresh_alarms_tab_layout)
         self._refresh_alarm_tree()
         self._refresh_alarm_sound_values()
 
@@ -4117,6 +4251,82 @@ class TimeSpecialistApp(tk.Tk):
                 tags=(status_tag,),
             )
 
+    def _sync_alarm_editor_toggle_text(self) -> None:
+        if not hasattr(self, "alarm_editor_toggle_btn"):
+            return
+        if self.alarm_editor_expanded_var.get():
+            text = "▾"
+        else:
+            text = "▸"
+        self.alarm_editor_toggle_btn.configure(text=text)
+
+    def _update_alarm_editor_visibility(self, mark_dirty: bool) -> None:
+        self._sync_alarm_editor_toggle_text()
+        if not hasattr(self, "alarm_editor_card"):
+            return
+        if self.alarm_editor_expanded_var.get():
+            self.alarm_editor_card.grid()
+        else:
+            self.alarm_editor_card.grid_remove()
+        if mark_dirty:
+            self._mark_settings_dirty()
+
+    def _refresh_alarms_tab_layout(self, event: tk.Event | None = None) -> None:
+        if event is not None and hasattr(event, "widget") and event.widget is not self.alarms_root:
+            return
+        if not all(
+            hasattr(self, attr)
+            for attr in ("alarms_root", "alarms_left_card", "alarms_right_panel", "alarm_help_label")
+        ):
+            return
+
+        width = max(1, self.alarms_root.winfo_width())
+        self.alarms_left_card.grid_configure(row=1, column=0, columnspan=1, padx=(0, 8), pady=(0, 0), sticky="nsew")
+        self.alarms_right_panel.grid_configure(row=1, column=1, columnspan=1, padx=(8, 0), pady=(0, 0), sticky="nsew")
+        self.alarms_root.rowconfigure(1, weight=1)
+        self.alarms_root.rowconfigure(2, weight=0)
+
+        if width < 1240:
+            left_weight, right_weight = 9, 1
+            alarm_wrap = max(560, int(width * 0.54))
+            timer_wrap = max(180, int(width * 0.12))
+        elif width < 1480:
+            left_weight, right_weight = 7, 2
+            alarm_wrap = max(640, int(width * 0.52))
+            timer_wrap = max(220, int(width * 0.16))
+        else:
+            left_weight, right_weight = 5, 2
+            alarm_wrap = max(700, int(width * 0.50))
+            timer_wrap = max(320, int(width * 0.22))
+
+        self.alarms_root.columnconfigure(0, weight=left_weight)
+        self.alarms_root.columnconfigure(1, weight=right_weight)
+        self.alarm_help_label.configure(wraplength=alarm_wrap)
+        if hasattr(self, "alarm_status_label"):
+            self.alarm_status_label.configure(wraplength=alarm_wrap)
+        if hasattr(self, "timer_help_label"):
+            self.timer_help_label.configure(wraplength=timer_wrap)
+        if all(hasattr(self, attr) for attr in ("timer_controls", "timer_script_browse_btn", "timer_repeat_check", "timer_repeat_entry", "timer_script_entry")):
+            timer_width = max(1, self.timer_controls.winfo_width())
+            timer_compact = timer_width < 360
+            if timer_compact:
+                self.timer_script_entry.grid_configure(row=1, column=1, columnspan=3, sticky="ew", padx=(6, 0), pady=(10, 0))
+                self.timer_script_browse_btn.grid_configure(row=2, column=1, columnspan=3, sticky="w", padx=(6, 0), pady=(6, 0))
+                self.timer_repeat_check.grid_configure(row=3, column=0, sticky="w", pady=(10, 0))
+                self.timer_repeat_entry.grid_configure(row=3, column=1, sticky="w", padx=(6, 12), pady=(10, 0))
+            else:
+                self.timer_script_entry.grid_configure(row=1, column=1, columnspan=2, sticky="ew", padx=(6, 12), pady=(10, 0))
+                self.timer_script_browse_btn.grid_configure(row=1, column=3, columnspan=1, sticky="e", padx=(0, 0), pady=(10, 0))
+                self.timer_repeat_check.grid_configure(row=2, column=0, sticky="w", pady=(10, 0))
+                self.timer_repeat_entry.grid_configure(row=2, column=1, sticky="w", padx=(6, 12), pady=(10, 0))
+
+    def _set_alarm_editor_expanded(self, expanded: bool, mark_dirty: bool) -> None:
+        self.alarm_editor_expanded_var.set(bool(expanded))
+        self._update_alarm_editor_visibility(mark_dirty=mark_dirty)
+
+    def _toggle_alarm_editor(self) -> None:
+        self._set_alarm_editor_expanded(not self.alarm_editor_expanded_var.get(), mark_dirty=True)
+
     def _alarm_kind_display(self, alarm: dict[str, object]) -> str:
         has_date = bool(str(alarm.get("date", "")).strip())
         has_script = bool(str(alarm.get("script", "")).strip())
@@ -4143,6 +4353,7 @@ class TimeSpecialistApp(tk.Tk):
         if not alarm:
             return
         self.alarm_selected_id = alarm_id
+        self._set_alarm_editor_expanded(True, mark_dirty=False)
         self.alarm_label_var.set(str(alarm.get("label", "")))
         self.alarm_zone_var.set(str(alarm.get("zone", "")))
         self.alarm_time_var.set(str(alarm.get("time", "")))
@@ -5034,6 +5245,7 @@ class TimeSpecialistApp(tk.Tk):
             "alarm_sound_default": self.alarm_sound_id_var.get(),
             "alarms": self.alarms,
             "alarms_paused": bool(self.alarms_paused_var.get()),
+            "alarm_editor_expanded": bool(self.alarm_editor_expanded_var.get()),
             "minimize_on_start": bool(self.minimize_on_start_var.get()),
             "fullscreen_auto_layout": bool(self.fullscreen_auto_layout_var.get()),
             "timer_minutes": self.timer_minutes_var.get(),
@@ -5321,8 +5533,10 @@ class TimeSpecialistApp(tk.Tk):
     def _set_alarm_pause_status_text(self, mark_dirty: bool) -> None:
         if self.alarms_paused_var.get():
             self.alarm_status_var.set(self._t("Alarmy i timery wstrzymane.", "Alarms and timers paused."))
+            self.alarm_pause_inline_var.set(self._t("Wstrzymane", "Paused"))
         else:
             self.alarm_status_var.set(self._t("Alarmy i timery aktywne.", "Alarms and timers active."))
+            self.alarm_pause_inline_var.set(self._t("Aktywne", "Active"))
         if mark_dirty:
             self._mark_settings_dirty()
 
@@ -5979,12 +6193,13 @@ class TimeSpecialistApp(tk.Tk):
         card.x = max(TILE_MARGIN, int(card.x))
         card.y = max(TILE_MARGIN, int(card.y))
 
-        available_w = max(90, card.width - 36)
-        reserved = 260 if card.height >= 360 else int(card.height * 0.5)
-        available_h = max(70, card.height - reserved)
-        clock_size = min(available_w, available_h)
+        available_w = max(80, card.width - 58)
+        content_reserved = 236 if card.height >= 360 else 216 if card.height >= 310 else 198
+        available_h = max(60, card.height - content_reserved)
+        clock_size = min(available_w, available_h, max(60, card.width - 72))
         if clock_size < 70:
             clock_size = available_w if available_w < available_h else available_h
+        clock_size = max(60, int(clock_size * 0.94))
 
         card_bg = str(self.theme_palette.get("card_bg", "#17223C"))
         card.canvas.configure(width=clock_size, height=clock_size, bg=card_bg)
@@ -6633,11 +6848,14 @@ class TimeSpecialistApp(tk.Tk):
     def _draw_clock(self, canvas: tk.Canvas, now_dt: datetime, phase_key: str, session_open: datetime | None, session_close: datetime | None, session_active: bool) -> None:
         canvas.delete("all")
 
-        width = int(canvas.cget("width"))
-        height = int(canvas.cget("height"))
+        width = max(int(canvas.winfo_width()), int(float(canvas.cget("width"))))
+        height = max(int(canvas.winfo_height()), int(float(canvas.cget("height"))))
+        if width <= 2 or height <= 2:
+            width = int(float(canvas.cget("width")))
+            height = int(float(canvas.cget("height")))
         cx = width / 2
         cy = height / 2
-        radius = min(width, height) / 2 - 10
+        radius = min(width, height) / 2 - max(8, min(width, height) * 0.08)
 
         phase_face = str(self.phase_bg.get(phase_key, "#1E2B4A"))
         if session_open and session_close:
